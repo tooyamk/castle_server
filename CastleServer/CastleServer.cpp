@@ -48,10 +48,12 @@ void start() {
 
 	while (true) {
 		printf("waiting client send msg now...\r\n");
-		if (SOCKET_ERROR != recvfrom(uiFdSocket, szbuffer, sizeof(szbuffer), 0, (struct  sockaddr*)&stClientAddr, &iAddrlen)) {
-			printf("Received datagram from %s--%s\n", inet_ntoa(stClientAddr.sin_addr), szbuffer);
+		int size = recvfrom(uiFdSocket, szbuffer, sizeof(szbuffer), 0, (struct  sockaddr*)&stClientAddr, &iAddrlen);
+		if (size > 0) {
+			printf("Received datagram from : %s size : %d data : %s\n", inet_ntoa(stClientAddr.sin_addr), size, szbuffer);
 
-			sendto(uiFdSocket, szbuffer, sizeof(szbuffer), 0, (struct sockaddr*)&stClientAddr, iAddrlen);
+			//sendto(uiFdSocket, szbuffer, sizeof(szbuffer), 0, (struct sockaddr*)&stClientAddr, iAddrlen);
+			sendto(uiFdSocket, szbuffer, size, 0, (struct sockaddr*)&stClientAddr, iAddrlen);
 		}
 	}
 
