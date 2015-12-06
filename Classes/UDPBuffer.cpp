@@ -45,7 +45,7 @@ void UDPBuffer::write(const char* data, int len) {
 	cur->state = DataBuffer::FULL;
 }
 
-bool UDPBuffer::read(char* buf, int len) {
+bool UDPBuffer::read(char* buf, int len, sockaddr* addr) {
 	DataBuffer* cur = _read;
 	DataBuffer* next = cur->next;
 	if (next != nullptr && next->state == DataBuffer::FULL) {
@@ -54,6 +54,12 @@ bool UDPBuffer::read(char* buf, int len) {
 		if (buf != nullptr) {
 			for (int i = 0; i < next->size; i++) {
 				buf[i] = next->buffer[i];
+			}
+		}
+		if (addr != nullptr) {
+			addr->sa_family = next->addr.sa_family;
+			for (int i = 0; i < 14; i++) {
+				addr->sa_data[i] = next->addr.sa_data[i];
 			}
 		}
 
@@ -83,12 +89,12 @@ bool UDPBuffer::send(BaseUDP* udp) {
 			return false;
 		}
 	} else {
-		return read(nullptr, 0);
+		return read(nullptr, 0, nullptr);
 	}
 }
 
 int UDPBuffer::receive(BaseUDP* udp) {
-	if (_head == nullptr || udp->getState() != UDPState::CONNECTED) -1;
+	if (_head == nullptr || udp->getState() != UDPState::CONNECTED) return -1;
 
 	DataBuffer* cur = _write;
 

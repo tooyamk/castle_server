@@ -1,7 +1,6 @@
 #pragma once
 
-#include "BaseUDP.h"
-#include "UDPBuffer.h"
+#include "NetServer.h"
 
 class Server {
 public:
@@ -11,6 +10,5 @@ public:
 	void run();
 
 protected:
-	BaseUDP* _udp;
-	UDPBuffer* _buffer;
+	NetServer* _net;
 };

@@ -80,6 +80,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Classes\BaseUDP.h" />
+    <ClInclude Include="..\Classes\ikcp.h" />
+    <ClInclude Include="..\Classes\NetServer.h" />
     <ClInclude Include="..\Classes\Server.h" />
     <ClInclude Include="..\Classes\UDPBuffer.h" />
     <ClInclude Include="..\Classes\UDPWin32.h" />
@@ -88,6 +90,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Classes\BaseUDP.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Classes\ikcp.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Classes\NetServer.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\Classes\Server.cpp">

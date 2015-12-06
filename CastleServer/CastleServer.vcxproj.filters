@@ -39,6 +39,12 @@
     <ClInclude Include="..\Classes\UDPWin32.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\Classes\ikcp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Classes\NetServer.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -57,6 +63,12 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\Classes\UDPWin32.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\ikcp.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\NetServer.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>

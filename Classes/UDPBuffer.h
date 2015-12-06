@@ -30,7 +30,7 @@ public:
 	~UDPBuffer();
 	void __fastcall create();
 	void __fastcall write(const char* data, int len);
-	bool __fastcall read(char* buf, int len);
+	bool __fastcall read(char* buf, int len, sockaddr* addr);
 	bool __fastcall send(BaseUDP* udp);
 	int __fastcall receive(BaseUDP* udp);
 	void __fastcall clear();
