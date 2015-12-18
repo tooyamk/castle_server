@@ -1,69 +1,72 @@
 #include "NetServer.h"
-#include "UDPWin32.h"
+#include "NetWin32.h"
 #include <thread>
+#include "Client.h"
 
 int _udp_output(const char *buf, int len, ikcpcb *kcp, void *user) {
-	NetServer* c = (NetServer*)user;
-	c->__send(buf, len);
+	//NetServer* c = (NetServer*)user;
+	//c->__send(buf, len);
 	return 0;
 }
 
 NetServer::NetServer() {
+	_socket = new SocketWin32();
 	_udp = new UDPWin32();
-	_sendBuffer->create();
-	_receiveBuffer->create();
+
+	_udpSendBuffer = new NetDataBuffer();
+	_udpReceiveBuffer = new NetDataBuffer();
 }
 
 NetServer::~NetServer() {
 }
 
 void NetServer::run() {
-	_udp->start(nullptr, 6000);
-	_kcp = ikcp_create(0xFFFFFFFF, this);
-	ikcp_nodelay(_kcp, 1, 10, 2, 1);
-	ikcp_nodelay(_kcp, 1, 10, 2, 1);
-	_kcp->output = _udp_output;
+	int prot = 6000;
 
-	std::thread receiveThread(&NetServer::_reciveHandler, this);
-	std::thread sendThread(&NetServer::_sendHandler, this);
-	receiveThread.detach();
-	sendThread.detach();
+	_udpSendBuffer->create();
+	_udpReceiveBuffer->create();
 
+	_socket->start(nullptr, 6000);
+	_udp->start(nullptr, prot + 1);
+
+	std::thread udpReceiveThread(&NetServer::_udpSendHandler, this);
+	std::thread udpSendThread(&NetServer::_udpReciveHandler, this);
+	udpReceiveThread.detach();
+	udpSendThread.detach();
+
+	std::thread socketAcceptThread(&NetServer::_socketAcceptHandler, this);
+	socketAcceptThread.detach();
+}
+
+void NetServer::_socketAcceptHandler() {
 	while (true) {
-		while (_receiveBuffer->read(_buffer, UDPBuffer::DataBuffer::MAX_LEN, &_addr)) {
-			ikcp_input(_kcp, _buffer, UDPBuffer::DataBuffer::MAX_LEN);
-			int size = ikcp_recv(_kcp, _buffer, UDPBuffer::DataBuffer::MAX_LEN);
-			if (size >= 0) {
+		sockaddr_in addr;
+		int addrLen = sizeof(addr);
+		memset(&addr, 0, addrLen);
+		
+		unsigned int s = _socket->acceptClient((struct sockaddr*)&addr, &addrLen);
+		Client* c = new Client(s, addr);
+		Client::addClient(c);
+		c->run();
 
-			}
+		Sleep(1);
+	}
+}
+
+void NetServer::_udpSendHandler() {
+	while (true) {
+		while (_udpSendBuffer->send(_udp)) {
 		}
-		//if (_buffer->receive(_udp) > 0) {
-		//	_buffer->send(_udp);
-		//}
 
 		Sleep(1);
 	}
 }
 
-void NetServer::_sendHandler() {
+void NetServer::_udpReciveHandler() {
 	while (true) {
-		while (_sendBuffer->send(_udp)) {
-		}
+		_udpReceiveBuffer->receive(_udp);
+		_udpReceiveBuffer->read(nullptr, 0);
 
 		Sleep(1);
-	}
-}
-
-void NetServer::_reciveHandler() {
-	while (true) {
-		_receiveBuffer->receive(_udp);
-
-		Sleep(1);
-	}
-}
-
-void NetServer::__send(const char* data, unsigned int len) {
-	if (_udp->getState() == UDPState::CONNECTED) {
-		_sendBuffer->write(data, len);
 	}
 }

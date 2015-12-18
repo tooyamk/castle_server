@@ -4,8 +4,10 @@ extern "C" {
 #include "ikcp.h"
 }
 
-#include "BaseUDP.h"
-#include "UDPBuffer.h"
+#include "BaseNet.h"
+#include "NetDataBuffer.h"
+
+class Client;
 
 class NetServer {
 public:
@@ -14,15 +16,22 @@ public:
 
 	void __fastcall run();
 	void __fastcall __send(const char* data, unsigned int len);
+	inline NetDataBuffer* __fastcall getUDPSendBuffer() {
+		return _udpSendBuffer;
+	}
+	inline NetDataBuffer* __fastcall getUDPReceiveBuffer() {
+		return _udpReceiveBuffer;
+	}
 
 protected:
-	BaseUDP* _udp;
+	BaseNet* _socket;
+	BaseNet* _udp;
 	ikcpcb* _kcp;
-	UDPBuffer* _sendBuffer;
-	UDPBuffer* _receiveBuffer;
-	char _buffer[UDPBuffer::DataBuffer::MAX_LEN];
-	sockaddr _addr;
+	NetDataBuffer* _udpSendBuffer;
+	NetDataBuffer* _udpReceiveBuffer;
 
-	void __fastcall _sendHandler();
-	void __fastcall _reciveHandler();
+	void __fastcall _connectHandler();
+	void __fastcall _socketAcceptHandler();
+	void __fastcall _udpSendHandler();
+	void __fastcall _udpReciveHandler();
 };

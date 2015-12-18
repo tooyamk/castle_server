@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "../Classes/Server.h"
+#include <windows.h>
 
 /* ÍøÂçAPIµÄ¶¯Ì¬Á´½Ó¿â */
 #pragma comment(lib, "ws2_32.lib")
@@ -10,6 +11,10 @@
 int _tmain(int argc, _TCHAR* argv[]) {
 	auto s = new Server();
 	s->run();
+
+	while (true) {
+		Sleep(1);
+	}
 
 	return 0;
 }
