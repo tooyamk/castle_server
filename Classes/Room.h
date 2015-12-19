@@ -1,6 +1,10 @@
 #pragma once
 
 #include <unordered_map>
+#include <mutex>
+#include <memory>
+
+class Client;
 
 class Room {
 public:
@@ -8,16 +12,26 @@ public:
 	virtual ~Room();
 
 	static Room* __fastcall create();
+	static void __fastcall remove(unsigned int id);
 	static Room* __fastcall get(unsigned int id);
 
 	inline unsigned int __fastcall getID() { return _id; }
-	void __fastcall addClient(unsigned int id);
-	void __fastcall removeClient(unsigned int id);
+	void __fastcall addClient(Client* c);
+	void __fastcall removeClient(Client* c);
+	virtual void __fastcall close();
+	unsigned int __fastcall getNumClients();
+
+	const std::tr1::shared_ptr<Room>& getSharedPtr() { return _self; }
 
 protected:
 	static unsigned int _idAccumulator;
+	static std::recursive_mutex _staticMtx;
 	static std::unordered_map<unsigned int, Room*> _rooms;
 
 	unsigned int _id;
-	std::unordered_map<unsigned int, bool> _clients;
+	bool _isClosed;
+	std::recursive_mutex _mtx;
+	std::unordered_map<unsigned int, std::tr1::shared_ptr<Client>> _clients;
+
+	std::tr1::shared_ptr<Room> _self;
 };

@@ -10,7 +10,7 @@ Client::Client(unsigned int socket, const sockaddr_in& addr) {
 	_id = _idAccumulator++;
 	_addr = addr;
 
-	curRoom = nullptr;
+	_isClosed = false;
 
 	_socket = new SocketWin32();
 	_socket->start(socket);
@@ -18,6 +18,12 @@ Client::Client(unsigned int socket, const sockaddr_in& addr) {
 	_socketReceiveBuffer = new NetDataBuffer();
 	_socketReceiveBuffer->create();
 	_socketReciveBytes = new ByteArray(false);
+
+	_self = std::tr1::shared_ptr<Client>(this);
+
+	char addr_p[INET_ADDRSTRLEN];
+	inet_ntop(AF_INET, &_addr.sin_addr, addr_p, sizeof(addr_p));
+	printf("new client connected -> %s:%d\n", addr_p, ntohs(_addr.sin_port));
 }
 
 Client::~Client() {
@@ -25,20 +31,15 @@ Client::~Client() {
 	delete _socketReceiveBuffer;
 	delete _socketReciveBytes;
 
-	if (curRoom != nullptr) {
-		curRoom->removeClient(_id);
-		curRoom = nullptr;
-	}
+	char addr_p[INET_ADDRSTRLEN];
+	inet_ntop(AF_INET, &_addr.sin_addr, addr_p, sizeof(addr_p));
+	printf("client deconnected -> %s:%d\n", addr_p, ntohs(_addr.sin_port));
 }
 
 unsigned int Client::_idAccumulator = 1;
 std::unordered_map<unsigned int, Client*> Client::_clients = std::unordered_map<unsigned int, Client*>();
 
 void Client::addClient(Client* c) {
-	char addr_p[INET_ADDRSTRLEN];
-	inet_ntop(AF_INET, &c->_addr.sin_addr, addr_p, sizeof(addr_p));
-	printf("new client connected -> %s:%d\n", addr_p, ntohs(c->_addr.sin_port));
-
 	_clients.insert(std::pair<unsigned int, Client*>(c->getID(), c));
 }
 
@@ -47,13 +48,56 @@ void Client::remvoeClient(unsigned int id) {
 	if (itr != _clients.end()) {
 		Client* c = itr->second;
 
-		char addr_p[INET_ADDRSTRLEN];
-		inet_ntop(AF_INET, &c->_addr.sin_addr, addr_p, sizeof(addr_p));
-		printf("client deconnected -> %s:%d\n", addr_p, ntohs(c->_addr.sin_port));
-
-		delete c;
+		c->close();
 		_clients.erase(itr);
 	}
+}
+
+void Client::close() {
+	bool b = _mtx.try_lock();
+	if (b) {
+		std::lock_guard<std::recursive_mutex> lck(_mtx, std::adopt_lock);
+
+		if (!_isClosed) {
+			_isClosed = true;
+
+			exitRoom();
+		}
+	}
+
+	_self.reset();
+}
+
+void Client::joinRoom(Room* room) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_curRoom.get() != room) {
+		if (_curRoom.get() != nullptr) {
+			exitRoom();
+		}
+		_curRoom = room->getSharedPtr();
+		room->addClient(this);
+	}
+}
+
+void Client::exitRoom() {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_curRoom.get() != nullptr) {
+		_curRoom->removeClient(this);
+
+		if (_curRoom->getNumClients() == 0) {
+			_curRoom->close();
+		}
+
+		_curRoom.reset();
+	}
+}
+
+Room* Client::getCurRoom() {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	return _curRoom.get();
 }
 
 void Client::run() {
@@ -97,29 +141,42 @@ void Client::_socketReceiveHandler() {
 }
 
 void Client::_receive0x0100(Packet* p) {
-	if (curRoom == nullptr) {
-		curRoom = Room::create();
-		curRoom->addClient(_id);
+	p->bytes.setPosition(0);
+	unsigned int id = p->bytes.readUnsignedInt();
+
+	if (id == 0) {
+		if (getCurRoom() == nullptr) {
+			Room* room = Room::create();
+			joinRoom(room);
+		}
+	} else {
+		Room* room = Room::get(id);
+		if (room != nullptr) {
+			exitRoom();
+			joinRoom(room);
+		}
 	}
 
 	ByteArray ba(false);
 	ba.writeUnsignedShort(0);
 	ba.writeUnsignedShort(0x0100);
-	ba.writeUnsignedInt(curRoom->getID());
+
+	_mtx.lock();
+	ba.writeUnsignedInt(_curRoom == nullptr ? 0 : _curRoom->getID());
+	_mtx.unlock();
+
 	ba.setPosition(0);
 	ba.writeUnsignedShort(ba.getLength() - 2);
 	_socket->sendData((const char*)ba.getBytes(), ba.getLength());
 }
 
 void Client::_receive0x0101(Packet* p) {
-	if (curRoom != nullptr) {
-		curRoom->removeClient(_id);
-		curRoom = nullptr;
-	}
+	exitRoom();
 
 	ByteArray ba(false);
 	ba.writeUnsignedShort(0);
-	ba.writeUnsignedShort(0x0101);
+	ba.writeUnsignedShort(0x0100);
+	ba.writeUnsignedInt(0);
 	ba.setPosition(0);
 	ba.writeUnsignedShort(ba.getLength() - 2);
 	_socket->sendData((const char*)ba.getBytes(), ba.getLength());

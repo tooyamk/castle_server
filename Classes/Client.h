@@ -2,6 +2,8 @@
 
 #include "NetWin32.h"
 #include <unordered_map>
+#include <memory>
+#include <mutex>
 
 class NetDataBuffer;
 class ByteArray;
@@ -18,14 +20,21 @@ public:
 
 	inline unsigned int __fastcall getID() { return _id; }
 	virtual void __fastcall run();
-
-	Room* curRoom;
+	virtual void __fastcall close();
+	virtual void __fastcall joinRoom(Room* room);
+	virtual void __fastcall exitRoom();
+	virtual Room* __fastcall getCurRoom();
+	const std::tr1::shared_ptr<Client>& getSharedPtr() { return _self; }
 
 protected:
 	static unsigned int _idAccumulator;
 	static std::unordered_map<unsigned int, Client*> _clients;
 
+	std::tr1::shared_ptr<Room> _curRoom;
+	bool _isClosed;
+	std::recursive_mutex _mtx;
 	unsigned int _id;
+	std::tr1::shared_ptr<Client> _self;
 	SocketWin32* _socket;
 	NetDataBuffer* _socketReceiveBuffer;
 	ByteArray* _socketReciveBytes;
