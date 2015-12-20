@@ -21,9 +21,10 @@ public:
 	inline unsigned int __fastcall getID() { return _id; }
 	virtual void __fastcall run();
 	virtual void __fastcall close();
-	virtual void __fastcall joinRoom(Room* room);
 	virtual void __fastcall exitRoom();
 	virtual Room* __fastcall getCurRoom();
+	virtual void __fastcall setCurRoom(Room* room);
+	virtual void __fastcall sendData(const char* bytes, int len);
 	const std::tr1::shared_ptr<Client>& getSharedPtr() { return _self; }
 
 protected:

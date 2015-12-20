@@ -68,18 +68,6 @@ void Client::close() {
 	_self.reset();
 }
 
-void Client::joinRoom(Room* room) {
-	std::lock_guard<std::recursive_mutex> lck(_mtx);
-
-	if (_curRoom.get() != room) {
-		if (_curRoom.get() != nullptr) {
-			exitRoom();
-		}
-		_curRoom = room->getSharedPtr();
-		room->addClient(this);
-	}
-}
-
 void Client::exitRoom() {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
@@ -98,6 +86,20 @@ Room* Client::getCurRoom() {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
 	return _curRoom.get();
+}
+
+void Client::setCurRoom(Room* room) {
+	if (room == nullptr) {
+		_curRoom.reset();
+	} else {
+		_curRoom = room->getSharedPtr();
+	}
+}
+
+void Client::sendData(const char* bytes, int len) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+	
+	_socket->sendData(bytes, len);
 }
 
 void Client::run() {
@@ -143,41 +145,17 @@ void Client::_socketReceiveHandler() {
 void Client::_receive0x0100(Packet* p) {
 	p->bytes.setPosition(0);
 	unsigned int id = p->bytes.readUnsignedInt();
-
-	if (id == 0) {
-		if (getCurRoom() == nullptr) {
-			Room* room = Room::create();
-			joinRoom(room);
-		}
-	} else {
-		Room* room = Room::get(id);
-		if (room != nullptr) {
-			exitRoom();
-			joinRoom(room);
-		}
-	}
-
-	ByteArray ba(false);
-	ba.writeUnsignedShort(0);
-	ba.writeUnsignedShort(0x0100);
-
-	_mtx.lock();
-	ba.writeUnsignedInt(_curRoom == nullptr ? 0 : _curRoom->getID());
-	_mtx.unlock();
-
-	ba.setPosition(0);
-	ba.writeUnsignedShort(ba.getLength() - 2);
-	_socket->sendData((const char*)ba.getBytes(), ba.getLength());
+	Room::joinRoom(this, id);
 }
 
 void Client::_receive0x0101(Packet* p) {
 	exitRoom();
 
-	ByteArray ba(false);
+	/*ByteArray ba(false);
 	ba.writeUnsignedShort(0);
 	ba.writeUnsignedShort(0x0100);
 	ba.writeUnsignedInt(0);
 	ba.setPosition(0);
 	ba.writeUnsignedShort(ba.getLength() - 2);
-	_socket->sendData((const char*)ba.getBytes(), ba.getLength());
+	_socket->sendData((const char*)ba.getBytes(), ba.getLength());*/
 }
