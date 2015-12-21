@@ -24,8 +24,15 @@ public:
 	virtual void __fastcall exitRoom();
 	virtual Room* __fastcall getCurRoom();
 	virtual void __fastcall setCurRoom(Room* room);
+	virtual void __fastcall switchReadyState();
+	virtual void __fastcall startLevel();
+	virtual void __fastcall syncClient(ByteArray* ba);
 	virtual void __fastcall sendData(const char* bytes, int len);
 	const std::tr1::shared_ptr<Client>& getSharedPtr() { return _self; }
+
+	int order;
+	bool ready;
+	bool levelInited;
 
 protected:
 	static unsigned int _idAccumulator;
@@ -42,7 +49,4 @@ protected:
 	sockaddr_in _addr;
 
 	void __fastcall _socketReceiveHandler();
-
-	void __fastcall _receive0x0100(Packet* p);
-	void __fastcall _receive0x0101(Packet* p);
 };

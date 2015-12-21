@@ -5,9 +5,16 @@
 #include <memory>
 
 class Client;
+class ByteArray;
 
 class Room {
 public:
+	enum class BattleState {
+		NONE,
+		INIT,
+		RUNNING
+	};
+
 	Room();
 	virtual ~Room();
 
@@ -21,6 +28,9 @@ public:
 	inline unsigned int __fastcall getID() { return _id; }
 	std::string  __fastcall addClient(Client* c);
 	void __fastcall removeClient(Client* c);
+	void __fastcall setClientReady(Client* c, bool b);
+	void __fastcall startLevel(Client* c);
+	void __fastcall syncClient(Client* c, ByteArray* ba);
 	virtual void __fastcall close();
 	unsigned int __fastcall getNumClients();
 
@@ -31,11 +41,18 @@ protected:
 	static std::recursive_mutex _staticMtx;
 	static std::unordered_map<unsigned int, Room*> _rooms;
 
+	unsigned int _syncClients;
+	unsigned int _clientsMask;
 	unsigned int _id;
 	bool _isClosed;
+	BattleState _battleState;
 	std::recursive_mutex _mtx;
 	std::unordered_map<unsigned int, std::tr1::shared_ptr<Client>> _clients;
 
 	std::tr1::shared_ptr<Room> _self;
 	Client* _host;
+
+	void __fastcall _sendLevelSyncComplete();
+	char __fastcall _getEmptyClientOrder();
+	void __fastcall _setClientOrderMask(unsigned char index, bool b);
 };

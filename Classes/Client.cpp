@@ -11,6 +11,9 @@ Client::Client(unsigned int socket, const sockaddr_in& addr) {
 	_addr = addr;
 
 	_isClosed = false;
+	order = -1;
+	ready = false;
+	levelInited = false;
 
 	_socket = new SocketWin32();
 	_socket->start(socket);
@@ -82,6 +85,30 @@ void Client::exitRoom() {
 	}
 }
 
+void Client::switchReadyState() {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_curRoom.get() != nullptr) {
+		_curRoom->setClientReady(this, !ready);
+	}
+}
+
+void Client::startLevel() {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_curRoom.get() != nullptr) {
+		_curRoom->startLevel(this);
+	}
+}
+
+void Client::syncClient(ByteArray* ba) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_curRoom.get() != nullptr) {
+		_curRoom->syncClient(this, ba);
+	}
+}
+
 Room* Client::getCurRoom() {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
@@ -128,9 +155,17 @@ void Client::_socketReceiveHandler() {
 			_socketReciveBytes->setPosition(_socketReciveBytes->getLength());
 
 			if (p.head == 0x0100) {
-				_receive0x0100(&p);
+				p.bytes.setPosition(0);
+				unsigned int id = p.bytes.readUnsignedInt();
+				Room::joinRoom(this, id);
 			} else if (p.head == 0x0101) {
-				_receive0x0101(&p);
+				exitRoom();
+			} else if (p.head == 0x0102) {
+				switchReadyState();
+			} else if (p.head == 0x0103) {
+				startLevel();
+			} else if (p.head == 0x0200) {
+				syncClient(&p.bytes);
 			}
 		} else {
 			break;
@@ -140,22 +175,4 @@ void Client::_socketReceiveHandler() {
 	}
 
 	Client::remvoeClient(_id);
-}
-
-void Client::_receive0x0100(Packet* p) {
-	p->bytes.setPosition(0);
-	unsigned int id = p->bytes.readUnsignedInt();
-	Room::joinRoom(this, id);
-}
-
-void Client::_receive0x0101(Packet* p) {
-	exitRoom();
-
-	/*ByteArray ba(false);
-	ba.writeUnsignedShort(0);
-	ba.writeUnsignedShort(0x0100);
-	ba.writeUnsignedInt(0);
-	ba.setPosition(0);
-	ba.writeUnsignedShort(ba.getLength() - 2);
-	_socket->sendData((const char*)ba.getBytes(), ba.getLength());*/
 }

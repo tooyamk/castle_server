@@ -7,6 +7,9 @@ Room::Room() {
 
 	_host = nullptr;
 	_isClosed = false;
+	_clientsMask = 0;
+
+	_battleState = BattleState::NONE;
 
 	_self = std::tr1::shared_ptr<Room>(this);
 
@@ -52,7 +55,7 @@ void Room::joinRoom(Client* c, unsigned int id) {
 
 	if (id == 0) {
 		Room* room = create();
-		room->addClient(c);
+		id = room->getID();
 	}
 
 	Room* room = get(id);
@@ -79,6 +82,11 @@ std::string Room::addClient(Client* c) {
 		std::lock_guard<std::recursive_mutex> lck(_mtx);
 
 		std::string error = "";
+
+		if (_battleState != BattleState::NONE) {
+			error = "battling";
+		}
+
 		if (c->getCurRoom() != nullptr) {
 			if (c->getCurRoom()->getID() == _id) {
 				error = "already in this room";
@@ -96,6 +104,8 @@ std::string Room::addClient(Client* c) {
 		auto& itr = _clients.find(c->getID());
 		if (itr == _clients.end()) {
 			c->setCurRoom(this);
+			c->order = _getEmptyClientOrder();
+			_setClientOrderMask(c->order, true);
 
 			for (auto& itr : _clients) {
 				Client* other = itr.second.get();
@@ -105,6 +115,7 @@ std::string Room::addClient(Client* c) {
 				ba.writeUnsignedShort(0x0100);
 				ba.writeUnsignedChar(3);
 				ba.writeUnsignedInt(c->getID());
+				ba.writeUnsignedChar(c->order);
 				ba.setPosition(0);
 				ba.writeUnsignedShort(ba.getLength() - 2);
 				other->sendData((const char*)ba.getBytes(), ba.getLength());
@@ -125,6 +136,8 @@ std::string Room::addClient(Client* c) {
 			for (auto& itr : _clients) {
 				Client* other = itr.second.get();
 				ba.writeUnsignedInt(other->getID());
+				ba.writeUnsignedChar(other->order);
+				ba.writeBool(other->ready);
 			}
 			ba.setPosition(0);
 			ba.writeUnsignedShort(ba.getLength() - 2);
@@ -142,6 +155,10 @@ void Room::removeClient(Client* c) {
 		auto& itr = _clients.find(c->getID());
 		if (itr != _clients.end()) {
 			_clients.erase(itr);
+			_setClientOrderMask(c->order, false);
+			c->order = -1;
+			c->ready = false;
+
 			if (_host == c) {
 				_host = nullptr;
 
@@ -157,7 +174,7 @@ void Room::removeClient(Client* c) {
 					ba.writeUnsignedShort(0);
 					ba.writeUnsignedShort(0x0100);
 					ba.writeUnsignedChar(5);
-					ba.writeUnsignedInt(c->getID());
+					ba.writeUnsignedInt(_host->getID());
 					ba.setPosition(0);
 					ba.writeUnsignedShort(ba.getLength() - 2);
 					other->sendData((const char*)ba.getBytes(), ba.getLength());
@@ -184,6 +201,123 @@ void Room::removeClient(Client* c) {
 			ba.setPosition(0);
 			ba.writeUnsignedShort(ba.getLength() - 2);
 			c->sendData((const char*)ba.getBytes(), ba.getLength());
+
+			_sendLevelSyncComplete();
+		}
+	}
+}
+
+void Room::setClientReady(Client* c, bool b) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_battleState == BattleState::NONE) {
+		if (c->ready != b && c->getCurRoom() == this) {
+			c->ready = b;
+		}
+
+		for (auto& itr : _clients) {
+			Client* c2 = itr.second.get();
+
+			ByteArray ba(false);
+			ba.writeUnsignedShort(0);
+			ba.writeUnsignedShort(0x0100);
+			ba.writeUnsignedChar(6);
+			ba.writeUnsignedInt(c->getID());
+			ba.writeBool(c->ready);
+			ba.setPosition(0);
+			ba.writeUnsignedShort(ba.getLength() - 2);
+			c2->sendData((const char*)ba.getBytes(), ba.getLength());
+		}
+	}
+}
+
+void Room::startLevel(Client* c) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_battleState == BattleState::NONE) {
+		bool ok = false;
+		if (_host == c) {
+			int n = _clients.size();
+			for (auto& itr : _clients) {
+				Client* c2 = itr.second.get();
+				if (c2->ready) {
+					n--;
+				}
+			}
+			ok = n == 0;
+		}
+
+		if (ok) {
+			for (auto& itr : _clients) {
+				Client* c2 = itr.second.get();
+				c2->levelInited = false;
+
+				ByteArray ba(false);
+				ba.writeUnsignedShort(0);
+				ba.writeUnsignedShort(0x0100);
+				ba.writeUnsignedChar(7);
+				ba.writeBool(true);
+				ba.setPosition(0);
+				ba.writeUnsignedShort(ba.getLength() - 2);
+				c2->sendData((const char*)ba.getBytes(), ba.getLength());
+			}
+
+			_syncClients = 0;
+			_battleState = BattleState::INIT;
+		} else {
+			ByteArray ba(false);
+			ba.writeUnsignedShort(0);
+			ba.writeUnsignedShort(0x0100);
+			ba.writeUnsignedChar(7);
+			ba.writeBool(false);
+			ba.setPosition(0);
+			ba.writeUnsignedShort(ba.getLength() - 2);
+			c->sendData((const char*)ba.getBytes(), ba.getLength());
+		}
+	}
+}
+
+void Room::syncClient(Client* c, ByteArray* data) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_battleState == BattleState::INIT) {
+		if (!c->levelInited) {
+			c->levelInited = true;
+			_syncClients++;
+
+			for (auto& itr : _clients) {
+				Client* c2 = itr.second.get();
+				if (c2 == c) continue;
+
+				ByteArray ba(false);
+				ba.writeUnsignedShort(0);
+				ba.writeUnsignedShort(0x0200);
+				ba.writeUnsignedChar(0);
+				ba.writeBytes(data);
+				ba.setPosition(0);
+				ba.writeUnsignedShort(ba.getLength() - 2);
+				c2->sendData((const char*)ba.getBytes(), ba.getLength());
+			}
+
+			_sendLevelSyncComplete();
+		}
+	}
+}
+
+void Room::_sendLevelSyncComplete() {
+	if (_battleState == BattleState::INIT && _syncClients >= _clients.size()) {
+		_battleState = BattleState::RUNNING;
+		for (auto& itr : _clients) {
+			Client* c = itr.second.get();
+
+			ByteArray ba(false);
+			ba.writeUnsignedShort(0);
+			ba.writeUnsignedShort(0x0200);
+			ba.writeUnsignedChar(1);
+			ba.writeUnsignedInt(_host->getID());
+			ba.setPosition(0);
+			ba.writeUnsignedShort(ba.getLength() - 2);
+			c->sendData((const char*)ba.getBytes(), ba.getLength());
 		}
 	}
 }
@@ -207,4 +341,22 @@ void Room::close() {
 	}
 
 	_self = nullptr;
+}
+
+char Room::_getEmptyClientOrder() {
+	for (char i = 0; i < MAX_NUM_PLAYERS; i++) {
+		if ((_clientsMask & (1 << i)) == 0) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+void Room::_setClientOrderMask(unsigned char index, bool b) {
+	if (b) {
+		_clientsMask |= 1 << index;
+	} else {
+		_clientsMask &= ~(1 << index);
+	}
 }
