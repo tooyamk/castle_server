@@ -63,16 +63,16 @@ void SocketWin32::start(unsigned int s) {
 	setsockopt(_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&o, sizeof(long));
 }
 
-void SocketWin32::sendData(const char* buf, int len) {
+void SocketWin32::sendData(const char* buf, int len, sockaddr* addr) {
 	if (_state != ConnectState::CONNECTED) return;
 	send(_socket, buf, len, 0);
 }
 
-int SocketWin32::receiveData(char* buf, int len) {
+int SocketWin32::receiveData(char* buf, int len, sockaddr* addr) {
 	if (_state != ConnectState::CONNECTED) return -1;
 	//CCLOG("start recive");
 	int len1 = recv(_socket, buf, len, 0);
-	if (len1 >= 0) printf("recive socket %d \n", len1);
+	//if (len1 >= 0) printf("recive socket %d \n", len1);
 	//CCLOG("end recive %d", len1);
 	return len1;
 }
@@ -140,16 +140,17 @@ void UDPWin32::start(char* addr, int port) {
 	_state = ConnectState::CONNECTED;
 }
 
-void UDPWin32::sendData(const char* buf, int len) {
+void UDPWin32::sendData(const char* buf, int len, sockaddr* addr) {
 	if (_state != ConnectState::CONNECTED) return;
-	sendto(_socket, buf, len, 0, (sockaddr*)&_serverAddr, _addrLen);
+	sendto(_socket, buf, len, 0, addr, _addrLen);
 }
 
-int UDPWin32::receiveData(char* buf, int len) {
+int UDPWin32::receiveData(char* buf, int len, sockaddr* addr) {
 	if (_state != ConnectState::CONNECTED) return -1;
 	//CCLOG("start recive");
-	int len1 = recvfrom(_socket, buf, len, 0, (sockaddr*)&_serverAddr, &_addrLen);
-	if (len1 >= 0) printf("recive udp %d \n", len1);
+	if (addr == nullptr) addr = (sockaddr*)&_serverAddr;
+	int len1 = recvfrom(_socket, buf, len, 0, addr, &_addrLen);
+	//if (len1 >= 0) printf("recive udp %d \n", len1);
 	//CCLOG("end recive %d", len1);
 	return len1;
 }

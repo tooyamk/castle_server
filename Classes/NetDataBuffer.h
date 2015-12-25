@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Winsock2.h>
+
 class BaseNet;
 class ByteArray;
 
@@ -21,15 +23,16 @@ public:
 		char buffer[MAX_LEN];
 		unsigned short size;
 		State state;
+		sockaddr_in addr;
 		BufferNode* next;
 	};
 
 	NetDataBuffer();
 	virtual ~NetDataBuffer();
 	void __fastcall create();
-	void __fastcall write(const char* data, int len);
+	void __fastcall write(const char* data, int len, sockaddr_in* addr);
 	bool __fastcall read(char* buf, int len);
-	bool __fastcall read(ByteArray* bytes);
+	bool __fastcall read(ByteArray* bytes, sockaddr* addr);
 	bool __fastcall send(BaseNet* net);
 	int __fastcall receive(BaseNet* net);
 	void __fastcall clear();

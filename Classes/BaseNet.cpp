@@ -15,10 +15,10 @@ void BaseNet::start(unsigned int s) {
 void BaseNet::close() {
 }
 
-void BaseNet::sendData(const char* buf, int len) {
+void BaseNet::sendData(const char* buf, int len, sockaddr* addr) {
 }
 
-int BaseNet::receiveData(char* buf, int len) {
+int BaseNet::receiveData(char* buf, int len, sockaddr* addr) {
 	return -1;
 }
 

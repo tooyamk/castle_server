@@ -250,7 +250,7 @@ void Room::startLevel(Client* c) {
 		if (ok) {
 			for (auto& itr : _clients) {
 				Client* c2 = itr.second.get();
-				c2->levelInited = false;
+				c2->levelInited = 0;
 
 				ByteArray ba(false);
 				ba.writeUnsignedShort(0);
@@ -263,7 +263,7 @@ void Room::startLevel(Client* c) {
 			}
 
 			_syncClients = 0;
-			_battleState = BattleState::INIT;
+			_battleState = BattleState::PRE_INIT;
 		} else {
 			ByteArray ba(false);
 			ba.writeUnsignedShort(0);
@@ -280,9 +280,9 @@ void Room::startLevel(Client* c) {
 void Room::syncClient(Client* c, ByteArray* data) {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
-	if (_battleState == BattleState::INIT) {
-		if (!c->levelInited) {
-			c->levelInited = true;
+	if (_battleState == BattleState::PRE_INIT) {
+		if (c->levelInited == 0) {
+			c->levelInited = 1;
 			_syncClients++;
 
 			for (auto& itr : _clients) {
@@ -296,7 +296,12 @@ void Room::syncClient(Client* c, ByteArray* data) {
 				ba.writeBytes(data);
 				ba.setPosition(0);
 				ba.writeUnsignedShort(ba.getLength() - 2);
+
+				printf("will send sync playerdata \n");
+
 				c2->sendData((const char*)ba.getBytes(), ba.getLength());
+
+				printf("send sync playerdata \n");
 			}
 
 			_sendLevelSyncComplete();
@@ -304,20 +309,69 @@ void Room::syncClient(Client* c, ByteArray* data) {
 	}
 }
 
-void Room::_sendLevelSyncComplete() {
-	if (_battleState == BattleState::INIT && _syncClients >= _clients.size()) {
-		_battleState = BattleState::RUNNING;
+void Room::syncEntity(Client* c, ByteArray* data) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_battleState == BattleState::RUNNING) {
 		for (auto& itr : _clients) {
-			Client* c = itr.second.get();
+			Client* c2 = itr.second.get();
+			if (c2 == c) continue;
 
 			ByteArray ba(false);
 			ba.writeUnsignedShort(0);
 			ba.writeUnsignedShort(0x0200);
-			ba.writeUnsignedChar(1);
-			ba.writeUnsignedInt(_host->getID());
+			ba.writeUnsignedChar(3);
+			ba.writeBytes(data);
 			ba.setPosition(0);
 			ba.writeUnsignedShort(ba.getLength() - 2);
-			c->sendData((const char*)ba.getBytes(), ba.getLength());
+			c2->sendData((const char*)ba.getBytes(), ba.getLength());
+		}
+	}
+}
+
+void Room::initLevelComplete(Client* c) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_battleState == BattleState::INITING) {
+		if (c->levelInited == 1) {
+			c->levelInited = 2;
+			_syncClients++;
+
+			_sendLevelSyncComplete();
+		}
+	}
+}
+
+void Room::_sendLevelSyncComplete() {
+	if (_syncClients >= _clients.size()) {
+		if (_battleState == BattleState::PRE_INIT) {
+			_syncClients = 0;
+			_battleState = BattleState::INITING;
+			for (auto& itr : _clients) {
+				Client* c = itr.second.get();
+
+				ByteArray ba(false);
+				ba.writeUnsignedShort(0);
+				ba.writeUnsignedShort(0x0200);
+				ba.writeUnsignedChar(1);
+				ba.writeUnsignedInt(_host->getID());
+				ba.setPosition(0);
+				ba.writeUnsignedShort(ba.getLength() - 2);
+				c->sendData((const char*)ba.getBytes(), ba.getLength());
+			}
+		} else if (_battleState == BattleState::INITING) {
+			_battleState = BattleState::RUNNING;
+			for (auto& itr : _clients) {
+				Client* c = itr.second.get();
+
+				ByteArray ba(false);
+				ba.writeUnsignedShort(0);
+				ba.writeUnsignedShort(0x0200);
+				ba.writeUnsignedChar(2);
+				ba.setPosition(0);
+				ba.writeUnsignedShort(ba.getLength() - 2);
+				c->sendData((const char*)ba.getBytes(), ba.getLength());
+			}
 		}
 	}
 }

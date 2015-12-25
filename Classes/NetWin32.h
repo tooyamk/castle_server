@@ -13,8 +13,8 @@ public:
 
 	virtual void __fastcall start(char* addr, int port);
 	virtual void __fastcall start(unsigned int s);
-	virtual void __fastcall sendData(const char* buf, int len);
-	virtual int __fastcall receiveData(char* buf, int len);
+	virtual void __fastcall sendData(const char* buf, int len, sockaddr* addr);
+	virtual int __fastcall receiveData(char* buf, int len, sockaddr* addr);
 	virtual unsigned int __fastcall acceptClient(sockaddr* addr, int* addrLen);
 	virtual void __fastcall close();
 	virtual ConnectState __fastcall getState();
@@ -33,8 +33,8 @@ public:
 	virtual ~UDPWin32();
 
 	virtual void __fastcall start(char* addr, int port);
-	virtual void __fastcall sendData(const char* buf, int len);
-	virtual int __fastcall receiveData(char* buf, int len);
+	virtual void __fastcall sendData(const char* buf, int len, sockaddr* addr);
+	virtual int __fastcall receiveData(char* buf, int len, sockaddr* addr);
 	virtual void __fastcall close();
 	virtual ConnectState __fastcall getState();
 

@@ -2,6 +2,8 @@
 #include "NetWin32.h"
 #include <thread>
 #include "Client.h"
+#include "ByteArray.h"
+#include "Packet.h"
 
 int _udp_output(const char *buf, int len, ikcpcb *kcp, void *user) {
 	//NetServer* c = (NetServer*)user;
@@ -15,6 +17,7 @@ NetServer::NetServer() {
 
 	_udpSendBuffer = new NetDataBuffer();
 	_udpReceiveBuffer = new NetDataBuffer();
+	_udpReciveBytes = new ByteArray(false);
 }
 
 NetServer::~NetServer() {
@@ -29,13 +32,21 @@ void NetServer::run() {
 	_socket->start(nullptr, 6000);
 	_udp->start(nullptr, prot + 1);
 
+	std::thread udpDispatchThread(&NetServer::_udpDispatchHandler, this);
 	std::thread udpReceiveThread(&NetServer::_udpSendHandler, this);
 	std::thread udpSendThread(&NetServer::_udpReciveHandler, this);
+	udpDispatchThread.detach();
 	udpReceiveThread.detach();
 	udpSendThread.detach();
 
 	std::thread socketAcceptThread(&NetServer::_socketAcceptHandler, this);
 	socketAcceptThread.detach();
+}
+
+void NetServer::sendUDP(const char* data, int len, sockaddr_in* addr) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	_udpSendBuffer->write(data, len, addr);
 }
 
 void NetServer::_socketAcceptHandler() {
@@ -45,7 +56,7 @@ void NetServer::_socketAcceptHandler() {
 		memset(&addr, 0, addrLen);
 		
 		unsigned int s = _socket->acceptClient((struct sockaddr*)&addr, &addrLen);
-		Client* c = new Client(s, addr);
+		Client* c = new Client(s, addr, this);
 		Client::addClient(c);
 		c->run();
 
@@ -65,7 +76,33 @@ void NetServer::_udpSendHandler() {
 void NetServer::_udpReciveHandler() {
 	while (true) {
 		_udpReceiveBuffer->receive(_udp);
-		_udpReceiveBuffer->read(nullptr, 0);
+
+		Sleep(1);
+	}
+}
+
+void NetServer::_udpDispatchHandler() {
+	sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+
+	while (true) {
+		while (_udpReceiveBuffer->read(_udpReciveBytes, (sockaddr*)&addr)) {
+			while (_udpReciveBytes->getLength() > 0) {
+				_udpReciveBytes->setPosition(0);
+				Packet p;
+				unsigned int size = Packet::parse(_udpReciveBytes, &p, true);
+				if (size > 0) _udpReciveBytes->popFront(size);
+				_udpReciveBytes->setPosition(_udpReciveBytes->getLength());
+
+				if (size == 0) break;
+
+				std::tr1::shared_ptr<Client> c = Client::getClient(p.clientID);
+				if (c != nullptr) {
+					c->receiveUDP(&p, &addr);
+				}
+			}
+			
+		}
 
 		Sleep(1);
 	}

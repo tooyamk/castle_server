@@ -11,7 +11,8 @@ class Room {
 public:
 	enum class BattleState {
 		NONE,
-		INIT,
+		PRE_INIT,
+		INITING,
 		RUNNING
 	};
 
@@ -31,6 +32,8 @@ public:
 	void __fastcall setClientReady(Client* c, bool b);
 	void __fastcall startLevel(Client* c);
 	void __fastcall syncClient(Client* c, ByteArray* ba);
+	void __fastcall syncEntity(Client* c, ByteArray* ba);
+	void __fastcall initLevelComplete(Client* c);
 	virtual void __fastcall close();
 	unsigned int __fastcall getNumClients();
 

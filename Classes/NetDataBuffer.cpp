@@ -20,7 +20,7 @@ void NetDataBuffer::create() {
 	_read->state = BufferNode::OCCUPY;
 }
 
-void NetDataBuffer::write(const char* data, int len) {
+void NetDataBuffer::write(const char* data, int len, sockaddr_in* addr) {
 	if (_head == nullptr) return;
 
 	BufferNode* cur = _write;
@@ -28,6 +28,7 @@ void NetDataBuffer::write(const char* data, int len) {
 	for (int i = 0; i < len; i++) {
 		cur->buffer[i] = data[i];
 	}
+	if (addr != nullptr) cur->addr = *addr;
 
 	if (cur->next == nullptr) {
 		if (_head->state == BufferNode::FREE) {
@@ -65,13 +66,14 @@ bool NetDataBuffer::read(char* buf, int len) {
 	}
 }
 
-bool NetDataBuffer::read(ByteArray* bytes) {
+bool NetDataBuffer::read(ByteArray* bytes, sockaddr* addr) {
 	BufferNode* cur = _read;
 	BufferNode* next = cur->next;
 	if (next != nullptr && next->state == BufferNode::FULL) {
 		next->state = BufferNode::OCCUPY;
 
 		bytes->writeBytes(next->buffer, 0, next->size);
+		if (addr != nullptr) *addr = *(sockaddr*)&next->addr;
 
 		_read = next;
 		cur->state = BufferNode::FREE;
@@ -89,7 +91,7 @@ bool NetDataBuffer::send(BaseNet* net) {
 		if (next != nullptr && next->state == BufferNode::FULL) {
 			next->state = BufferNode::OCCUPY;
 
-			net->sendData(next->buffer, next->size);
+			net->sendData(next->buffer, next->size, (sockaddr*)&next->addr);
 
 			_read = next;
 			cur->state = BufferNode::FREE;
@@ -108,7 +110,7 @@ int NetDataBuffer::receive(BaseNet* net) {
 
 	BufferNode* cur = _write;
 
-	int len = net->receiveData(cur->buffer, BufferNode::MAX_LEN);
+	int len = net->receiveData(cur->buffer, BufferNode::MAX_LEN, (sockaddr*)&cur->addr);
 	if (len > 0) {
 		if (cur->next == nullptr) {
 			if (_head->state == BufferNode::FREE) {
