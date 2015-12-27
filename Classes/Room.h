@@ -41,7 +41,7 @@ public:
 
 protected:
 	static unsigned int _idAccumulator;
-	static std::recursive_mutex _staticMtx;
+	static std::recursive_mutex* _staticMtx;
 	static std::unordered_map<unsigned int, Room*> _rooms;
 
 	unsigned int _syncClients;

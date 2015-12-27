@@ -5,12 +5,6 @@
 #include "ByteArray.h"
 #include "Packet.h"
 
-int _udp_output(const char *buf, int len, ikcpcb *kcp, void *user) {
-	//NetServer* c = (NetServer*)user;
-	//c->__send(buf, len);
-	return 0;
-}
-
 NetServer::NetServer() {
 	_socket = new SocketWin32();
 	_udp = new UDPWin32();
@@ -43,10 +37,10 @@ void NetServer::run() {
 	socketAcceptThread.detach();
 }
 
-void NetServer::sendUDP(const char* data, int len, sockaddr_in* addr) {
+void NetServer::sendUDP(bool kcp, const char* data, int len, sockaddr_in* addr) {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
-	_udpSendBuffer->write(data, len, addr);
+	_udpSendBuffer->write(kcp, data, len, addr);
 }
 
 void NetServer::_socketAcceptHandler() {
@@ -87,20 +81,27 @@ void NetServer::_udpDispatchHandler() {
 
 	while (true) {
 		while (_udpReceiveBuffer->read(_udpReciveBytes, (sockaddr*)&addr)) {
-			while (_udpReciveBytes->getLength() > 0) {
-				_udpReciveBytes->setPosition(0);
-				Packet p;
-				unsigned int size = Packet::parse(_udpReciveBytes, &p, true);
-				if (size > 0) _udpReciveBytes->popFront(size);
-				_udpReciveBytes->setPosition(_udpReciveBytes->getLength());
+			unsigned int readSize = 0;
+			_udpReciveBytes->setPosition(0);
+			while (_udpReciveBytes->getBytesAvailable() > 1) {
+				unsigned short size = _udpReciveBytes->readUnsignedShort();
+				if (_udpReciveBytes->getBytesAvailable() >= size) {
+					readSize = size + 2;
+					unsigned int id = _udpReciveBytes->readUnsignedInt();
+					bool kcp = _udpReciveBytes->readBool();
+					std::tr1::shared_ptr<Client> c = Client::getClient(id);
+					if (c != nullptr) {
+						c->receiveUDP(_udpReciveBytes, kcp, size - 5, &addr);
+					}
 
-				if (size == 0) break;
-
-				std::tr1::shared_ptr<Client> c = Client::getClient(p.clientID);
-				if (c != nullptr) {
-					c->receiveUDP(&p, &addr);
+					_udpReciveBytes->setPosition(readSize);
+				} else {
+					break;
 				}
 			}
+
+			if (readSize > 0) _udpReciveBytes->popFront(readSize);
+			_udpReciveBytes->setPosition(_udpReciveBytes->getLength());
 			
 		}
 

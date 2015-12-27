@@ -31,6 +31,7 @@ public:
 	virtual ~NetDataBuffer();
 	void __fastcall create();
 	void __fastcall write(const char* data, int len, sockaddr_in* addr);
+	void __fastcall write(bool kcp, const char* data, unsigned short len, sockaddr_in* addr);
 	bool __fastcall read(char* buf, int len);
 	bool __fastcall read(ByteArray* bytes, sockaddr* addr);
 	bool __fastcall send(BaseNet* net);

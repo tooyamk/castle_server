@@ -45,6 +45,39 @@ void NetDataBuffer::write(const char* data, int len, sockaddr_in* addr) {
 	cur->state = BufferNode::FULL;
 }
 
+void NetDataBuffer::write(bool kcp, const char* data, unsigned short len, sockaddr_in* addr) {
+	if (_head == nullptr) return;
+
+	BufferNode* cur = _write;
+
+	unsigned short totalLen = len + 1;
+	char* p = (char*)&totalLen;
+	cur->buffer[0] = p[0];
+	cur->buffer[1] = p[1];
+
+	cur->buffer[2] = kcp ? 1 : 0;
+
+	for (int i = 0; i < len; i++) {
+		cur->buffer[3 + i] = data[i];
+	}
+	if (addr != nullptr) cur->addr = *addr;
+
+	if (cur->next == nullptr) {
+		if (_head->state == BufferNode::FREE) {
+			cur->next = _head;
+			_head = _head->next;
+			cur->next->next = nullptr;
+		}
+		else {
+			cur->next = new BufferNode();
+		}
+	}
+	_write = cur->next;
+
+	cur->size = totalLen + 2;
+	cur->state = BufferNode::FULL;
+}
+
 bool NetDataBuffer::read(char* buf, int len) {
 	BufferNode* cur = _read;
 	BufferNode* next = cur->next;

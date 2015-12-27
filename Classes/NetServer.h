@@ -17,7 +17,7 @@ public:
 
 	void __fastcall run();
 	void __fastcall __send(const char* data, unsigned int len);
-	void __fastcall sendUDP(const char* data, int len, sockaddr_in* addr);
+	void __fastcall sendUDP(bool kcp, const char* data, int len, sockaddr_in* addr);
 
 protected:
 	std::recursive_mutex _mtx;

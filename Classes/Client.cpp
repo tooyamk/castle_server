@@ -7,6 +7,50 @@
 #include "Room.h"
 #include "NetServer.h"
 
+static inline void itimeofday(long *sec, long *usec) {
+#if defined(__unix)
+	struct timeval time;
+	gettimeofday(&time, NULL);
+	if (sec) *sec = time.tv_sec;
+	if (usec) *usec = time.tv_usec;
+#else
+	static long mode = 0, addsec = 0;
+	BOOL retval;
+	static IINT64 freq = 1;
+	IINT64 qpc;
+	if (mode == 0) {
+		retval = QueryPerformanceFrequency((LARGE_INTEGER*)&freq);
+		freq = (freq == 0) ? 1 : freq;
+		retval = QueryPerformanceCounter((LARGE_INTEGER*)&qpc);
+		addsec = (long)time(NULL);
+		addsec = addsec - (long)((qpc / freq) & 0x7fffffff);
+		mode = 1;
+	}
+	retval = QueryPerformanceCounter((LARGE_INTEGER*)&qpc);
+	retval = retval * 2;
+	if (sec) *sec = (long)(qpc / freq) + addsec;
+	if (usec) *usec = (long)((qpc % freq) * 1000000 / freq);
+#endif
+}
+
+static inline IINT64 iclock64(void) {
+	long s, u;
+	IINT64 value;
+	itimeofday(&s, &u);
+	value = ((IINT64)s) * 1000 + (u / 1000);
+	return value;
+}
+
+static inline IUINT32 iclock() {
+	return (IUINT32)(iclock64() & 0xfffffffful);
+}
+
+int _udp_output(const char *buf, int len, ikcpcb *kcp, void *user) {
+	Client* c = (Client*)user;
+	c->__sendUDP(buf, len);
+	return 0;
+}
+
 Client::Client(unsigned int socket, const sockaddr_in& addr, NetServer* server) {
 	_id = _idAccumulator++;
 	_addr = addr;
@@ -25,6 +69,10 @@ Client::Client(unsigned int socket, const sockaddr_in& addr, NetServer* server) 
 	_socketReceiveBuffer->create();
 	_socketReciveBytes = new ByteArray(false);
 
+	_kcp = ikcp_create(0xFFFFFFFF, this);
+	ikcp_nodelay(_kcp, 1, 10, 2, 1);
+	_kcp->output = _udp_output;
+
 	_self = std::tr1::shared_ptr<Client>(this);
 
 	char addr_p[INET_ADDRSTRLEN];
@@ -36,24 +84,25 @@ Client::~Client() {
 	delete _socket;
 	delete _socketReceiveBuffer;
 	delete _socketReciveBytes;
+	ikcp_release(_kcp);
 
 	char addr_p[INET_ADDRSTRLEN];
 	inet_ntop(AF_INET, &_addr.sin_addr, addr_p, sizeof(addr_p));
 	printf("client deconnected -> %s:%d\n", addr_p, ntohs(_addr.sin_port));
 }
 
-std::recursive_mutex Client::_staticMtx = std::recursive_mutex();
+std::recursive_mutex* Client::_staticMtx = new std::recursive_mutex();
 unsigned int Client::_idAccumulator = 1;
 std::unordered_map<unsigned int, Client*> Client::_clients = std::unordered_map<unsigned int, Client*>();
 
 void Client::addClient(Client* c) {
-	std::lock_guard<std::recursive_mutex> lck(_staticMtx);
+	std::lock_guard<std::recursive_mutex> lck(*_staticMtx);
 
 	_clients.insert(std::pair<unsigned int, Client*>(c->getID(), c));
 }
 
 void Client::remvoeClient(unsigned int id) {
-	std::lock_guard<std::recursive_mutex> lck(_staticMtx);
+	std::lock_guard<std::recursive_mutex> lck(*_staticMtx);
 
 	auto& itr = _clients.find(id);
 	if (itr != _clients.end()) {
@@ -65,7 +114,7 @@ void Client::remvoeClient(unsigned int id) {
 }
 
 std::tr1::shared_ptr<Client> Client::getClient(unsigned int id) {
-	std::lock_guard<std::recursive_mutex> lck(_staticMtx);
+	std::lock_guard<std::recursive_mutex> lck(*_staticMtx);
 
 	auto& itr = _clients.find(id);
 	if (itr == _clients.end()) {
@@ -90,7 +139,7 @@ void Client::close() {
 	_self.reset();
 }
 
-void Client::receiveUDP(Packet* p, sockaddr_in* addr) {
+void Client::receiveUDP(ByteArray* bytes, bool kcp, unsigned short len, sockaddr_in* addr) {
 	if (udpAddr == nullptr) {
 		udpAddr = new sockaddr_in();
 		memset(udpAddr, 0, sizeof(sockaddr_in));
@@ -100,7 +149,17 @@ void Client::receiveUDP(Packet* p, sockaddr_in* addr) {
 		udpAddr->sin_port = addr->sin_port;
 	}
 
-	_executePacket(p);
+	if (kcp) {
+		bytes->readBytes(_udpReceiveToKcpBuffer, 0, len);
+		ikcp_input(_kcp, _udpReceiveToKcpBuffer, len);
+	} else {
+		Packet p;
+		p.head = bytes->readUnsignedShort();
+		len -= 2;
+		if (len > 0) bytes->readBytes(&p.bytes, 0, len);
+		p.bytes.setPosition(0);
+		_executePacket(&p);
+	}
 }
 
 void Client::exitRoom() {
@@ -157,15 +216,30 @@ void Client::setCurRoom(Room* room) {
 	}
 }
 
-void Client::sendData(const char* bytes, int len, bool udp) {
+void Client::sendData(const char* bytes, int len, NetType type) {
 	std::lock_guard<std::recursive_mutex> lck(_sendMtx);
 	
-	if (udp) {
-		if (udpAddr != nullptr) {
-			_server->sendUDP(bytes, len, udpAddr);
+	if (type == NetType::TCP) {
+		char* p = (char*)&len;
+		_tcpSendBuffer[0] = p[0];
+		_tcpSendBuffer[1] = p[1];
+		for (unsigned short i = 0; i < len; i++) {
+			_tcpSendBuffer[2 + i] = bytes[i];
 		}
-	} else {
-		_socket->sendData(bytes, len, nullptr);
+		
+		_socket->sendData(_tcpSendBuffer, len + 2, nullptr);
+	} else if (type == NetType::KCP) {
+		ikcp_send(_kcp, bytes, len);
+	} else if (type == NetType::UDP) {
+		if (udpAddr != nullptr) {
+			_server->sendUDP(false, bytes, len, udpAddr);
+		}
+	}
+}
+
+void Client::__sendUDP(const char* data, unsigned int len) {
+	if (udpAddr != nullptr) {
+		_server->sendUDP(true, data, len, udpAddr);
 	}
 }
 
@@ -178,6 +252,12 @@ void Client::run() {
 	ba.setPosition(0);
 	ba.writeUnsignedShort(ba.getLength() - 2);
 	_socket->sendData((const char*)ba.getBytes(), ba.getLength(), nullptr);
+
+	_selfTcp = _self;
+	_selfKcp = _self;
+
+	std::thread kcpThread(&Client::_kcpHandler, this);
+	kcpThread.detach();
 
 	std::thread t(&Client::_socketReceiveHandler, this);
 	t.detach();
@@ -207,6 +287,36 @@ void Client::_socketReceiveHandler() {
 	}
 
 	Client::remvoeClient(_id);
+
+	_selfTcp.reset();
+}
+
+void Client::_kcpHandler() {
+	while (true) {
+		if (_isClosed) {
+			break;
+		} else {
+			ikcp_update(_kcp, iclock());
+
+			while (true) {
+				int kcpSize = ikcp_recv(_kcp, _kcpReceiveBuffer, NetDataBuffer::BufferNode::MAX_LEN);
+				if (kcpSize > 0) {
+					ByteArray ba(false, (unsigned char*)_kcpReceiveBuffer, kcpSize);
+					Packet p;
+					p.head = ba.readUnsignedShort();
+					ba.readBytes(&p.bytes, 0, 0);
+					p.bytes.setPosition(0);
+					_executePacket(&p);
+				} else {
+					break;
+				}
+			}
+		}
+
+		Sleep(1);
+	}
+
+	_selfKcp.reset();
 }
 
 void Client::_executePacket(Packet* p) {
@@ -218,7 +328,7 @@ void Client::_executePacket(Packet* p) {
 		ba.writeUnsignedShort(0x0002);
 		ba.setPosition(0);
 		ba.writeUnsignedShort(ba.getLength() - 2);
-		sendData((const char*)ba.getBytes(), ba.getLength(), true);
+		sendData((const char*)ba.getBytes(), ba.getLength(), NetType::KCP);
 	} else if (p->head == 0x0100) {
 		p->bytes.setPosition(0);
 		unsigned int id = p->bytes.readUnsignedInt();

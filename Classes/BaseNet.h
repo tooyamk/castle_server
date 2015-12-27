@@ -3,8 +3,9 @@
 struct sockaddr;
 
 enum class NetType {
-	SOCKET,
-	UDP
+	TCP,
+	UDP,
+	KCP
 };
 
 enum class ConnectState {
