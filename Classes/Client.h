@@ -65,6 +65,9 @@ protected:
 	ByteArray* _socketReciveBytes;
 	sockaddr_in _addr;
 	ikcpcb* _kcp;
+	NetDataBuffer* _kcpSendBuffer;
+	NetDataBuffer* _kcpReceiveBuffer2;
+	IUINT32 _nextUpdateKCPTime;
 	char _udpReceiveToKcpBuffer[NetDataBuffer::BufferNode::MAX_LEN];
 	char _kcpReceiveBuffer[NetDataBuffer::BufferNode::MAX_LEN];
 	char _tcpSendBuffer[NetDataBuffer::BufferNode::MAX_LEN];

@@ -1,5 +1,9 @@
 #pragma once
 
+extern "C" {
+#include "ikcp.h"
+}
+
 #include <Winsock2.h>
 
 class BaseNet;
@@ -32,9 +36,12 @@ public:
 	void __fastcall create();
 	void __fastcall write(const char* data, int len, sockaddr_in* addr);
 	void __fastcall write(bool kcp, const char* data, unsigned short len, sockaddr_in* addr);
+	void __fastcall write(ByteArray* bytes, unsigned short len, sockaddr_in* addr);
 	bool __fastcall read(char* buf, int len);
 	bool __fastcall read(ByteArray* bytes, sockaddr* addr);
+	bool __fastcall read(ikcpcb* kcp);
 	bool __fastcall send(BaseNet* net);
+	bool __fastcall send(ikcpcb* kcp);
 	int __fastcall receive(BaseNet* net);
 	void __fastcall clear();
 

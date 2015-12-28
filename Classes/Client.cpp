@@ -67,9 +67,15 @@ Client::Client(unsigned int socket, const sockaddr_in& addr, NetServer* server) 
 
 	_socketReceiveBuffer = new NetDataBuffer();
 	_socketReceiveBuffer->create();
+	_kcpSendBuffer = new NetDataBuffer();
+	_kcpSendBuffer->create();
+	_kcpReceiveBuffer2 = new NetDataBuffer();
+	_kcpReceiveBuffer2->create();
 	_socketReciveBytes = new ByteArray(false);
 
+	_nextUpdateKCPTime = 0;
 	_kcp = ikcp_create(0xFFFFFFFF, this);
+	ikcp_setmtu(_kcp, 1000);
 	ikcp_nodelay(_kcp, 1, 10, 2, 1);
 	_kcp->output = _udp_output;
 
@@ -150,8 +156,9 @@ void Client::receiveUDP(ByteArray* bytes, bool kcp, unsigned short len, sockaddr
 	}
 
 	if (kcp) {
-		bytes->readBytes(_udpReceiveToKcpBuffer, 0, len);
-		ikcp_input(_kcp, _udpReceiveToKcpBuffer, len);
+		//bytes->readBytes(_udpReceiveToKcpBuffer, 0, len);
+		_kcpReceiveBuffer2->write(bytes, len, nullptr);
+		//ikcp_input(_kcp, _udpReceiveToKcpBuffer, len);
 	} else {
 		Packet p;
 		p.head = bytes->readUnsignedShort();
@@ -229,7 +236,8 @@ void Client::sendData(const char* bytes, int len, NetType type) {
 		
 		_socket->sendData(_tcpSendBuffer, len + 2, nullptr);
 	} else if (type == NetType::KCP) {
-		ikcp_send(_kcp, bytes, len);
+		_kcpSendBuffer->write(bytes, len, nullptr);
+		//ikcp_send(_kcp, bytes, len);
 	} else if (type == NetType::UDP) {
 		if (udpAddr != nullptr) {
 			_server->sendUDP(false, bytes, len, udpAddr);
@@ -296,8 +304,21 @@ void Client::_kcpHandler() {
 		if (_isClosed) {
 			break;
 		} else {
-			ikcp_update(_kcp, iclock());
+			bool isChanged = false;
+			while (_kcpSendBuffer->send(_kcp)) {
+				isChanged = true;
+			}
 
+			while (_kcpReceiveBuffer2->read(_kcp)) {
+				isChanged = true;
+			}
+
+			IUINT32 t = iclock();
+			if (isChanged || t >= _nextUpdateKCPTime) {
+				ikcp_update(_kcp, t);
+				_nextUpdateKCPTime = ikcp_check(_kcp, t);
+			}
+			
 			while (true) {
 				int kcpSize = ikcp_recv(_kcp, _kcpReceiveBuffer, NetDataBuffer::BufferNode::MAX_LEN);
 				if (kcpSize > 0) {
@@ -324,10 +345,7 @@ void Client::_executePacket(Packet* p) {
 
 	if (p->head == 0x0002) {
 		ByteArray ba(false);
-		ba.writeUnsignedShort(0);
 		ba.writeUnsignedShort(0x0002);
-		ba.setPosition(0);
-		ba.writeUnsignedShort(ba.getLength() - 2);
 		sendData((const char*)ba.getBytes(), ba.getLength(), NetType::KCP);
 	} else if (p->head == 0x0100) {
 		p->bytes.setPosition(0);

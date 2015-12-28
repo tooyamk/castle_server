@@ -67,14 +67,38 @@ void NetDataBuffer::write(bool kcp, const char* data, unsigned short len, sockad
 			cur->next = _head;
 			_head = _head->next;
 			cur->next->next = nullptr;
-		}
-		else {
+		} else {
 			cur->next = new BufferNode();
 		}
 	}
 	_write = cur->next;
 
 	cur->size = totalLen + 2;
+	cur->state = BufferNode::FULL;
+}
+
+void NetDataBuffer::write(ByteArray* bytes, unsigned short len, sockaddr_in* addr) {
+	if (_head == nullptr) return;
+
+	BufferNode* cur = _write;
+
+	if (len > 0) {
+		bytes->readBytes(cur->buffer, 0, len);
+	}
+	if (addr != nullptr) cur->addr = *addr;
+
+	if (cur->next == nullptr) {
+		if (_head->state == BufferNode::FREE) {
+			cur->next = _head;
+			_head = _head->next;
+			cur->next->next = nullptr;
+		} else {
+			cur->next = new BufferNode();
+		}
+	}
+	_write = cur->next;
+
+	cur->size = len;
 	cur->state = BufferNode::FULL;
 }
 
@@ -117,6 +141,23 @@ bool NetDataBuffer::read(ByteArray* bytes, sockaddr* addr) {
 	}
 }
 
+bool NetDataBuffer::read(ikcpcb* kcp) {
+	BufferNode* cur = _read;
+	BufferNode* next = cur->next;
+	if (next != nullptr && next->state == BufferNode::FULL) {
+		next->state = BufferNode::OCCUPY;
+
+		ikcp_input(kcp, next->buffer, next->size);
+
+		_read = next;
+		cur->state = BufferNode::FREE;
+
+		return true;
+	} else {
+		return false;
+	}
+}
+
 bool NetDataBuffer::send(BaseNet* net) {
 	if (net->getState() == ConnectState::CONNECTED) {
 		BufferNode* cur = _read;
@@ -135,6 +176,23 @@ bool NetDataBuffer::send(BaseNet* net) {
 		}
 	} else {
 		return read(nullptr, 0);
+	}
+}
+
+bool NetDataBuffer::send(ikcpcb* kcp) {
+	BufferNode* cur = _read;
+	BufferNode* next = cur->next;
+	if (next != nullptr && next->state == BufferNode::FULL) {
+		next->state = BufferNode::OCCUPY;
+
+		ikcp_send(kcp, next->buffer, next->size);
+
+		_read = next;
+		cur->state = BufferNode::FREE;
+
+		return true;
+	} else {
+		return false;
 	}
 }
 
