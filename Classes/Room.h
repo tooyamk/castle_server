@@ -33,6 +33,7 @@ public:
 	void __fastcall startLevel(Client* c);
 	void __fastcall syncClient(Client* c, ByteArray* ba);
 	void __fastcall syncEntity(Client* c, ByteArray* ba);
+	void __fastcall syncEntityHP(Client* c, ByteArray* ba);
 	void __fastcall initLevelComplete(Client* c);
 	virtual void __fastcall close();
 	unsigned int __fastcall getNumClients();

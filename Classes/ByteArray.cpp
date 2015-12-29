@@ -3,14 +3,14 @@
 ByteArray::ByteArray(bool bigEndian, unsigned int size) {
 	this->_bigEndian = bigEndian;
 
-	_bytes = new unsigned char[size];
+	_bytes = new char[size];
 	_rawLength = size;
 	_length = 0;
 	_position = 0;
 	_isExternalData = false;
 }
 
-ByteArray::ByteArray(bool bigEndian, unsigned char* bytes, unsigned int size) {
+ByteArray::ByteArray(bool bigEndian, char* bytes, unsigned int size) {
 	this->_bigEndian = bigEndian;
 
 	this->_bytes = bytes;
@@ -29,7 +29,7 @@ ByteArray::~ByteArray() {
 	}
 }
 
-const unsigned char* ByteArray::getBytes() const { return _bytes; }
+const char* ByteArray::getBytes() const { return _bytes; }
 
 unsigned int ByteArray::getBytesAvailable() {
 	return _length - _position;
@@ -49,7 +49,7 @@ void ByteArray::setLength(unsigned int len) {
 }
 
 void ByteArray::_resize(unsigned int len) {
-	unsigned char* newBytes = new unsigned char[len];
+	char* newBytes = new char[len];
 
 	unsigned int min = len > _rawLength ? _rawLength : len;
 
@@ -348,7 +348,7 @@ void ByteArray::writeBytes(ByteArray* ba, unsigned int offset, unsigned int leng
 		length = ba->getLength() - offset;
 	}
 
-	const unsigned char* baBytes = ba->getBytes();
+	const char* baBytes = ba->getBytes();
 
 	_checkLength(length);
 

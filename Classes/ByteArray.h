@@ -5,10 +5,10 @@
 class ByteArray {
 public:
 	ByteArray(bool bigEndian, unsigned int size=32);
-	ByteArray(bool bigEndian, unsigned char* bytes, unsigned int size);
+	ByteArray(bool bigEndian, char* bytes, unsigned int size);
 	virtual ~ByteArray();
 
-	const unsigned char* __fastcall getBytes() const;
+	const char* __fastcall getBytes() const;
 
 	unsigned int __fastcall getLength();
 	void __fastcall setLength(unsigned int len);
@@ -52,7 +52,7 @@ public:
 	void __fastcall popFront(unsigned int len);
 
 protected:
-	unsigned char* _bytes;
+	char* _bytes;
 	unsigned int _position;
 	unsigned int _length;
 	unsigned int _rawLength;

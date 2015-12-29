@@ -322,7 +322,7 @@ void Client::_kcpHandler() {
 			while (true) {
 				int kcpSize = ikcp_recv(_kcp, _kcpReceiveBuffer, NetDataBuffer::BufferNode::MAX_LEN);
 				if (kcpSize > 0) {
-					ByteArray ba(false, (unsigned char*)_kcpReceiveBuffer, kcpSize);
+					ByteArray ba(false, _kcpReceiveBuffer, kcpSize);
 					Packet p;
 					p.head = ba.readUnsignedShort();
 					ba.readBytes(&p.bytes, 0, 0);
@@ -363,5 +363,9 @@ void Client::_executePacket(Packet* p) {
 		initLevelComplete();
 	} else if (p->head == 0x0202) {
 		syncEntity(&p->bytes);
+	} else if (p->head == 0x0203) {
+		if (_curRoom.get() != nullptr) {
+			_curRoom->syncEntityHP(this, &p->bytes);
+		}
 	}
 }

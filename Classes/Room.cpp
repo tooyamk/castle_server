@@ -70,7 +70,7 @@ void Room::joinRoom(Client* c, unsigned int id) {
 		ba.writeUnsignedShort(0x0100);
 		ba.writeUnsignedChar(0);
 		ba.writeString(error.c_str());
-		c->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+		c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 	}
 }
 
@@ -112,7 +112,7 @@ std::string Room::addClient(Client* c) {
 				ba.writeUnsignedChar(3);
 				ba.writeUnsignedInt(c->getID());
 				ba.writeUnsignedChar(c->order);
-				other->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+				other->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 
 			_clients.insert(std::pair<unsigned int, std::tr1::shared_ptr<Client>>(c->getID(), c->getSharedPtr()));
@@ -132,7 +132,7 @@ std::string Room::addClient(Client* c) {
 				ba.writeUnsignedChar(other->order);
 				ba.writeBool(other->ready);
 			}
-			c->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+			c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 		}
 
 		return "";
@@ -168,7 +168,7 @@ void Room::removeClient(Client* c) {
 					ba.writeUnsignedShort(0x0100);
 					ba.writeUnsignedChar(5);
 					ba.writeUnsignedInt(_host->getID());
-					other->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+					other->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 				}
 			}
 
@@ -179,13 +179,13 @@ void Room::removeClient(Client* c) {
 				ba.writeUnsignedShort(0x0100);
 				ba.writeUnsignedChar(4);
 				ba.writeUnsignedInt(c->getID());
-				other->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+				other->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 
 			ByteArray ba(false);
 			ba.writeUnsignedShort(0x0100);
 			ba.writeUnsignedChar(2);
-			c->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+			c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 
 			_sendLevelSyncComplete();
 		}
@@ -208,7 +208,7 @@ void Room::setClientReady(Client* c, bool b) {
 			ba.writeUnsignedChar(6);
 			ba.writeUnsignedInt(c->getID());
 			ba.writeBool(c->ready);
-			c2->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+			c2->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 		}
 	}
 }
@@ -238,7 +238,7 @@ void Room::startLevel(Client* c) {
 				ba.writeUnsignedShort(0x0100);
 				ba.writeUnsignedChar(7);
 				ba.writeBool(true);
-				c2->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+				c2->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 
 			_syncClients = 0;
@@ -248,7 +248,7 @@ void Room::startLevel(Client* c) {
 			ba.writeUnsignedShort(0x0100);
 			ba.writeUnsignedChar(7);
 			ba.writeBool(false);
-			c->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+			c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 		}
 	}
 }
@@ -269,7 +269,7 @@ void Room::syncClient(Client* c, ByteArray* data) {
 				ba.writeUnsignedShort(0x0200);
 				ba.writeUnsignedChar(0);
 				ba.writeBytes(data);
-				c2->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+				c2->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 
 			_sendLevelSyncComplete();
@@ -289,7 +289,21 @@ void Room::syncEntity(Client* c, ByteArray* data) {
 			ba.writeUnsignedShort(0x0200);
 			ba.writeUnsignedChar(3);
 			ba.writeBytes(data);
-			c2->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::KCP);
+			c2->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
+		}
+	}
+}
+
+void Room::syncEntityHP(Client* c, ByteArray* data) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_battleState == BattleState::RUNNING) {
+		if (_host != nullptr) {
+			ByteArray ba(false);
+			ba.writeUnsignedShort(0x0200);
+			ba.writeUnsignedChar(4);
+			ba.writeBytes(data);
+			_host->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
 		}
 	}
 }
@@ -319,7 +333,7 @@ void Room::_sendLevelSyncComplete() {
 				ba.writeUnsignedShort(0x0200);
 				ba.writeUnsignedChar(1);
 				ba.writeUnsignedInt(_host->getID());
-				c->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+				c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 		} else if (_battleState == BattleState::INITING) {
 			_battleState = BattleState::RUNNING;
@@ -329,7 +343,7 @@ void Room::_sendLevelSyncComplete() {
 				ByteArray ba(false);
 				ba.writeUnsignedShort(0x0200);
 				ba.writeUnsignedChar(2);
-				c->sendData((const char*)ba.getBytes(), ba.getLength(), NetType::TCP);
+				c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 		}
 	}
