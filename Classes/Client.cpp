@@ -273,7 +273,7 @@ void Client::run() {
 
 void Client::_socketReceiveHandler() {
 	while (true) {
-		if (_socketReceiveBuffer->receive(_socket) >= 0) {
+		if (_socketReceiveBuffer->receive(_socket) > 0) {
 			_socketReceiveBuffer->read(_socketReciveBytes, nullptr);
 
 			while (_socketReciveBytes->getLength() > 0) {
