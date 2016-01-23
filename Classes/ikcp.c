@@ -182,6 +182,7 @@ static void ikcp_segment_delete(ikcpcb *kcp, IKCPSEG *seg)
 // write log
 void ikcp_log(ikcpcb *kcp, int mask, const char *fmt, ...)
 {
+	/*
 	char buffer[1024];
 	va_list argptr;
 	if ((mask & kcp->logmask) == 0 || kcp->writelog == 0) return;
@@ -189,6 +190,7 @@ void ikcp_log(ikcpcb *kcp, int mask, const char *fmt, ...)
 	vsprintf(buffer, fmt, argptr);
 	va_end(argptr);
 	kcp->writelog(buffer, kcp, kcp->user);
+	*/
 }
 
 // check log mask

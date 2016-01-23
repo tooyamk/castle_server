@@ -153,41 +153,78 @@ void Room::removeClient(Client* c) {
 			c->order = -1;
 			c->ready = false;
 
-			if (_host == c) {
-				_host = nullptr;
+			if (_battleState == BattleState::NONE) {
+				if (_host == c) {
+					_host = nullptr;
 
-				for (auto& itr : _clients) {
-					_host = itr.second.get();
-					break;
+					for (auto& itr : _clients) {
+						_host = itr.second.get();
+						break;
+					}
+
+					if (_host != nullptr) {
+						ByteArray ba(false);
+						ba.writeUnsignedShort(0x0100);
+						ba.writeUnsignedChar(5);
+						ba.writeUnsignedInt(_host->getID());
+
+						for (auto& itr : _clients) {
+							Client* other = itr.second.get();
+							other->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
+						}
+					}
 				}
-
-				for (auto& itr : _clients) {
-					Client* other = itr.second.get();
-
-					ByteArray ba(false);
-					ba.writeUnsignedShort(0x0100);
-					ba.writeUnsignedChar(5);
-					ba.writeUnsignedInt(_host->getID());
-					other->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
-				}
-			}
-
-			for (auto& itr : _clients) {
-				Client* other = itr.second.get();
 
 				ByteArray ba(false);
 				ba.writeUnsignedShort(0x0100);
 				ba.writeUnsignedChar(4);
 				ba.writeUnsignedInt(c->getID());
-				other->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
+
+				for (auto& itr : _clients) {
+					Client* other = itr.second.get();
+					other->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
+				}
+
+
+				ba.setLength(0);
+				ba.writeUnsignedShort(0x0100);
+				ba.writeUnsignedChar(2);
+				c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
+
+				_sendLevelSyncComplete();
+			} else {
+				if (_host == c) {
+					_host = nullptr;
+				}
+
+				ByteArray ba(false);
+				ba.writeUnsignedShort(0x0200);
+				ba.writeUnsignedChar(5);
+				ba.writeUnsignedInt(c->getID());
+
+				for (auto& itr : _clients) {
+					Client* other = itr.second.get();
+					other->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
+				}
+
+				if (_host == nullptr && _battleState != BattleState::FINISHING) {
+					_battleState = BattleState::FINISHING;
+					
+					ba.setLength(0);
+					ba.writeUnsignedShort(0x0200);
+					ba.writeUnsignedChar(6);
+					ba.writeUnsignedChar(3);
+
+					for (auto& itr : _clients) {
+						Client* other = itr.second.get();
+						other->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
+					}
+				}
 			}
+		}
 
-			ByteArray ba(false);
-			ba.writeUnsignedShort(0x0100);
-			ba.writeUnsignedChar(2);
-			c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
-
-			_sendLevelSyncComplete();
+		if (getNumClients() == 0) {
+			close();
 		}
 	}
 }

@@ -62,16 +62,16 @@ Client::Client(unsigned int socket, const sockaddr_in& addr, NetServer* server) 
 	ready = false;
 	levelInited = 0;
 
-	_socket = new SocketWin32();
-	_socket->start(socket);
+	_tcp = new SocketWin32();
+	_tcp->start(socket);
 
-	_socketReceiveBuffer = new NetDataBuffer();
-	_socketReceiveBuffer->create();
+	_tcpReceiveBuffer = new NetDataBuffer();
+	_tcpReceiveBuffer->create();
 	_kcpSendBuffer = new NetDataBuffer();
 	_kcpSendBuffer->create();
 	_kcpReceiveBuffer2 = new NetDataBuffer();
 	_kcpReceiveBuffer2->create();
-	_socketReciveBytes = new ByteArray(false);
+	_tcpReciveBytes = new ByteArray(false);
 
 	_nextUpdateKCPTime = 0;
 	_kcp = ikcp_create(0xFFFFFFFF, this);
@@ -87,9 +87,11 @@ Client::Client(unsigned int socket, const sockaddr_in& addr, NetServer* server) 
 }
 
 Client::~Client() {
-	delete _socket;
-	delete _socketReceiveBuffer;
-	delete _socketReciveBytes;
+	exitRoom();
+
+	delete _tcp;
+	delete _tcpReceiveBuffer;
+	delete _tcpReciveBytes;
 	ikcp_release(_kcp);
 
 	char addr_p[INET_ADDRSTRLEN];
@@ -172,11 +174,6 @@ void Client::receiveUDP(ByteArray* bytes, bool kcp, unsigned short len, sockaddr
 void Client::exitRoom() {
 	if (_curRoom.get() != nullptr) {
 		_curRoom->removeClient(this);
-
-		if (_curRoom->getNumClients() == 0) {
-			_curRoom->close();
-		}
-
 		_curRoom.reset();
 	}
 }
@@ -234,7 +231,7 @@ void Client::sendData(const char* bytes, int len, NetType type) {
 			_tcpSendBuffer[2 + i] = bytes[i];
 		}
 		
-		_socket->sendData(_tcpSendBuffer, len + 2, nullptr);
+		_tcp->sendData(_tcpSendBuffer, len + 2, nullptr);
 	} else if (type == NetType::KCP) {
 		_kcpSendBuffer->write(bytes, len, nullptr);
 		//ikcp_send(_kcp, bytes, len);
@@ -259,7 +256,7 @@ void Client::run() {
 	ba.writeUnsignedInt(_id);
 	ba.setPosition(0);
 	ba.writeUnsignedShort(ba.getLength() - 2);
-	_socket->sendData((const char*)ba.getBytes(), ba.getLength(), nullptr);
+	_tcp->sendData((const char*)ba.getBytes(), ba.getLength(), nullptr);
 
 	_selfTcp = _self;
 	_selfKcp = _self;
@@ -267,21 +264,21 @@ void Client::run() {
 	std::thread kcpThread(&Client::_kcpHandler, this);
 	kcpThread.detach();
 
-	std::thread t(&Client::_socketReceiveHandler, this);
+	std::thread t(&Client::_tcpReceiveHandler, this);
 	t.detach();
 }
 
-void Client::_socketReceiveHandler() {
+void Client::_tcpReceiveHandler() {
 	while (true) {
-		if (_socketReceiveBuffer->receive(_socket) > 0) {
-			_socketReceiveBuffer->read(_socketReciveBytes, nullptr);
+		if (_tcpReceiveBuffer->receive(_tcp) > 0) {
+			_tcpReceiveBuffer->read(_tcpReciveBytes, nullptr);
 
-			while (_socketReciveBytes->getLength() > 0) {
-				_socketReciveBytes->setPosition(0);
+			while (_tcpReciveBytes->getLength() > 0) {
+				_tcpReciveBytes->setPosition(0);
 				Packet p;
-				unsigned int size = Packet::parse(_socketReciveBytes, &p);
-				if (size > 0) _socketReciveBytes->popFront(size);
-				_socketReciveBytes->setPosition(_socketReciveBytes->getLength());
+				unsigned int size = Packet::parse(_tcpReciveBytes, &p);
+				if (size > 0) _tcpReciveBytes->popFront(size);
+				_tcpReciveBytes->setPosition(_tcpReciveBytes->getLength());
 
 				if (size == 0) break;
 
@@ -343,29 +340,50 @@ void Client::_kcpHandler() {
 void Client::_executePacket(Packet* p) {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
-	if (p->head == 0x0002) {
+	switch (p->head) {
+	case 0x0002: {
 		ByteArray ba(false);
 		ba.writeUnsignedShort(0x0002);
 		sendData((const char*)ba.getBytes(), ba.getLength(), NetType::KCP);
-	} else if (p->head == 0x0100) {
+		break;
+	}
+	case 0x0100: {
 		p->bytes.setPosition(0);
 		unsigned int id = p->bytes.readUnsignedInt();
 		Room::joinRoom(this, id);
-	} else if (p->head == 0x0101) {
+		break;
+	}
+	case 0x0101: {
 		exitRoom();
-	} else if (p->head == 0x0102) {
+		break;
+	}
+	case 0x0102: {
 		switchReadyState();
-	} else if (p->head == 0x0103) {
+		break;
+	}
+	case 0x0103: {
 		startLevel();
-	} else if (p->head == 0x0200) {
+		break;
+	}
+	case 0x0200: {
 		syncClient(&p->bytes);
-	} else if (p->head == 0x0201) {
+		break;
+	}
+	case 0x0201: {
 		initLevelComplete();
-	} else if (p->head == 0x0202) {
+		break;
+	}
+	case 0x0202: {
 		syncEntity(&p->bytes);
-	} else if (p->head == 0x0203) {
+		break;
+	}
+	case 0x0203: {
 		if (_curRoom.get() != nullptr) {
 			_curRoom->syncEntityHP(this, &p->bytes);
 		}
+		break;
+	}
+	default:
+		break;
 	}
 }

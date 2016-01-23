@@ -60,9 +60,9 @@ protected:
 	std::tr1::shared_ptr<Client> _self;
 	std::tr1::shared_ptr<Client> _selfTcp;
 	std::tr1::shared_ptr<Client> _selfKcp;
-	SocketWin32* _socket;
-	NetDataBuffer* _socketReceiveBuffer;
-	ByteArray* _socketReciveBytes;
+	SocketWin32* _tcp;
+	NetDataBuffer* _tcpReceiveBuffer;
+	ByteArray* _tcpReciveBytes;
 	sockaddr_in _addr;
 	ikcpcb* _kcp;
 	NetDataBuffer* _kcpSendBuffer;
@@ -72,7 +72,7 @@ protected:
 	char _kcpReceiveBuffer[NetDataBuffer::BufferNode::MAX_LEN];
 	char _tcpSendBuffer[NetDataBuffer::BufferNode::MAX_LEN];
 
-	void __fastcall _socketReceiveHandler();
+	void __fastcall _tcpReceiveHandler();
 	void __fastcall _kcpHandler();
 	void __fastcall _executePacket(Packet* p);
 };

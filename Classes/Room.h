@@ -13,7 +13,8 @@ public:
 		NONE,
 		PRE_INIT,
 		INITING,
-		RUNNING
+		RUNNING,
+		FINISHING
 	};
 
 	Room();
