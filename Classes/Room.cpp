@@ -208,17 +208,7 @@ void Room::removeClient(Client* c) {
 				}
 
 				if (_host == nullptr && _battleState != BattleState::FINISHING) {
-					_battleState = BattleState::FINISHING;
-					
-					ba.setLength(0);
-					ba.writeUnsignedShort(0x0200);
-					ba.writeUnsignedChar(6);
-					ba.writeUnsignedChar(3);
-
-					for (auto& itr : _clients) {
-						Client* other = itr.second.get();
-						other->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
-					}
+					_sendFinishState(3);
 				}
 			}
 		}
@@ -278,7 +268,6 @@ void Room::startLevel(Client* c) {
 				c2->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 
-			_syncClients = 0;
 			_battleState = BattleState::PRE_INIT;
 		} else {
 			ByteArray ba(false);
@@ -296,7 +285,6 @@ void Room::syncClient(Client* c, ByteArray* data) {
 	if (_battleState == BattleState::PRE_INIT) {
 		if (c->levelInited == 0) {
 			c->levelInited = 1;
-			_syncClients++;
 
 			for (auto& itr : _clients) {
 				Client* c2 = itr.second.get();
@@ -345,42 +333,78 @@ void Room::syncEntityHP(Client* c, ByteArray* data) {
 	}
 }
 
+void Room::syncEntityGeneratorCreate(Client* c, ByteArray* data) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_battleState == BattleState::RUNNING) {
+		if (_host != nullptr) {
+			ByteArray ba(false);
+			ba.writeUnsignedShort(0x0200);
+			ba.writeUnsignedChar(7);
+			ba.writeUnsignedInt(data->readUnsignedInt());
+			
+			for (auto& itr : _clients) {
+				Client* other = itr.second.get();
+				if (other == c) continue;
+
+				other->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
+			}
+		}
+	}
+}
+
 void Room::initLevelComplete(Client* c) {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
 	if (_battleState == BattleState::INITING) {
 		if (c->levelInited == 1) {
 			c->levelInited = 2;
-			_syncClients++;
 
 			_sendLevelSyncComplete();
 		}
 	}
 }
 
+bool Room::_isEqualInitState(unsigned int state) {
+	for (auto& itr : _clients) {
+		Client* c = itr.second.get();
+
+		if (c->levelInited != state) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void Room::_sendLevelSyncComplete() {
-	if (_syncClients >= _clients.size()) {
-		if (_battleState == BattleState::PRE_INIT) {
-			_syncClients = 0;
+	if (_battleState != BattleState::RUNNING) {
+		if (_battleState == BattleState::PRE_INIT && _isEqualInitState(1)) {
 			_battleState = BattleState::INITING;
+
+			ByteArray ba(false);
+			ba.writeUnsignedShort(0x0200);
+			ba.writeUnsignedChar(1);
+			ba.writeUnsignedInt(_host == nullptr ? 0 : _host->getID());
+
 			for (auto& itr : _clients) {
 				Client* c = itr.second.get();
-
-				ByteArray ba(false);
-				ba.writeUnsignedShort(0x0200);
-				ba.writeUnsignedChar(1);
-				ba.writeUnsignedInt(_host->getID());
 				c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
-		} else if (_battleState == BattleState::INITING) {
+		} else if (_battleState == BattleState::INITING && _isEqualInitState(2)) {
 			_battleState = BattleState::RUNNING;
+
+			ByteArray ba(false);
+			ba.writeUnsignedShort(0x0200);
+			ba.writeUnsignedChar(2);
+
 			for (auto& itr : _clients) {
 				Client* c = itr.second.get();
-
-				ByteArray ba(false);
-				ba.writeUnsignedShort(0x0200);
-				ba.writeUnsignedChar(2);
 				c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
+			}
+
+			if (_host == nullptr) {
+				_sendFinishState(3);
 			}
 		}
 	}
@@ -399,6 +423,11 @@ void Room::close() {
 
 		if (!_isClosed) {
 			_isClosed = true;
+
+			for (auto& itr : _clients) {
+				Client* c = itr.second.get();
+				c->exitRoom();
+			}
 
 			remove(_id);
 		}
@@ -422,5 +451,23 @@ void Room::_setClientOrderMask(unsigned char index, bool b) {
 		_clientsMask |= 1 << index;
 	} else {
 		_clientsMask &= ~(1 << index);
+	}
+}
+
+void Room::_sendFinishState(unsigned char state) {
+	_battleState = BattleState::FINISHING;
+
+	ByteArray ba(false);
+	ba.writeUnsignedShort(0x0200);
+	ba.writeUnsignedChar(6);
+	ba.writeUnsignedChar(state);
+
+	for (auto& itr : _clients) {
+		Client* c = itr.second.get();
+		c->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
+	}
+
+	if (state == 3) {
+		close();
 	}
 }

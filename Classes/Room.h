@@ -35,6 +35,7 @@ public:
 	void __fastcall syncClient(Client* c, ByteArray* ba);
 	void __fastcall syncEntity(Client* c, ByteArray* ba);
 	void __fastcall syncEntityHP(Client* c, ByteArray* ba);
+	void __fastcall syncEntityGeneratorCreate(Client* c, ByteArray* ba);
 	void __fastcall initLevelComplete(Client* c);
 	virtual void __fastcall close();
 	unsigned int __fastcall getNumClients();
@@ -46,7 +47,6 @@ protected:
 	static std::recursive_mutex* _staticMtx;
 	static std::unordered_map<unsigned int, Room*> _rooms;
 
-	unsigned int _syncClients;
 	unsigned int _clientsMask;
 	unsigned int _id;
 	bool _isClosed;
@@ -60,4 +60,6 @@ protected:
 	void __fastcall _sendLevelSyncComplete();
 	char __fastcall _getEmptyClientOrder();
 	void __fastcall _setClientOrderMask(unsigned char index, bool b);
+	bool __fastcall _isEqualInitState(unsigned int state);
+	void __fastcall _sendFinishState(unsigned char state);
 };
