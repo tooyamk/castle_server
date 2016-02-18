@@ -24,6 +24,9 @@ public:
 
 	static Room* __fastcall create();
 	static void __fastcall remove(unsigned int id);
+	static void __fastcall addToState(Room* room, BattleState oldState);
+	static void __fastcall removeFromState(Room* room);
+	static std::unordered_map<unsigned int, Room*>* __fastcall getMapFromState(BattleState state);
 	static Room* __fastcall get(unsigned int id);
 	static void __fastcall joinRoom(Client* c, unsigned int id);
 
@@ -39,6 +42,8 @@ public:
 	void __fastcall initLevelComplete(Client* c);
 	virtual void __fastcall close();
 	unsigned int __fastcall getNumClients();
+	inline BattleState __fastcall getBattleState() { return _battleState; }
+	void __fastcall setBattleState(BattleState state);
 
 	const std::tr1::shared_ptr<Room>& getSharedPtr() { return _self; }
 
@@ -46,6 +51,8 @@ protected:
 	static unsigned int _idAccumulator;
 	static std::recursive_mutex* _staticMtx;
 	static std::unordered_map<unsigned int, Room*> _rooms;
+	static std::unordered_map<unsigned int, Room*> _combatRooms;
+	static std::unordered_map<unsigned int, Room*> _nocombatRooms;
 
 	unsigned int _clientsMask;
 	unsigned int _id;

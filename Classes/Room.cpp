@@ -23,28 +23,80 @@ Room::~Room() {
 unsigned int Room::_idAccumulator = 1;
 std::recursive_mutex* Room::_staticMtx = new std::recursive_mutex();
 std::unordered_map<unsigned int, Room*> Room::_rooms = std::unordered_map<unsigned int, Room*>();
+std::unordered_map<unsigned int, Room*> Room::_combatRooms = std::unordered_map<unsigned int, Room*>();
+std::unordered_map<unsigned int, Room*> Room::_nocombatRooms = std::unordered_map<unsigned int, Room*>();
 
 Room* Room::create() {
 	std::unique_lock<std::recursive_mutex> lck(*_staticMtx);
 	
 	Room* r = new Room();
 	_rooms.insert(std::pair<unsigned int, Room*>(r->getID(), r));
+	_nocombatRooms.insert(std::pair<unsigned int, Room*>(r->getID(), r));
 	return r;
 }
 
 Room* Room::get(unsigned int id) {
 	std::lock_guard<std::recursive_mutex> lck(*_staticMtx);
 
-	auto& itr = _rooms.find(id);
+	auto itr = _rooms.find(id);
 	return itr == _rooms.end() ? nullptr : itr->second;
 }
 
 void Room::remove(unsigned int id) {
 	std::lock_guard<std::recursive_mutex> lck(*_staticMtx);
 
-	auto& itr = _rooms.find(id);
+	auto itr = _rooms.find(id);
 	if (itr != _rooms.end()) {
+		Room* room = itr->second;
+
+		removeFromState(room);
+
 		_rooms.erase(itr);
+	}
+}
+
+std::unordered_map<unsigned int, Room*>* __fastcall Room::getMapFromState(BattleState state) {
+	std::unordered_map<unsigned int, Room*>* map = nullptr;
+	if (state == BattleState::NONE) {
+		map = &_nocombatRooms;
+	} else {
+		map = &_combatRooms;
+	}
+
+	return map;
+}
+
+void Room::addToState(Room* room, BattleState oldState) {
+	std::lock_guard<std::recursive_mutex> lck(*_staticMtx);
+
+	std::unordered_map<unsigned int, Room*>* oldMap = getMapFromState(oldState);
+	std::unordered_map<unsigned int, Room*>* newMap = getMapFromState(room->getBattleState());
+
+	if (newMap != oldMap) {
+		if (oldMap != nullptr) {
+			auto itr = oldMap->find(room->getID());
+			if (itr != oldMap->end()) {
+				oldMap->erase(itr);
+			}
+		}
+
+		if (newMap != nullptr) {
+			auto itr = newMap->find(room->getID());
+			if (itr == newMap->end()) {
+				newMap->insert(std::pair<unsigned int, Room*>(room->getID(), room));
+			}
+		}
+	}
+}
+
+void Room::removeFromState(Room* room) {
+	std::unordered_map<unsigned int, Room*>* map = getMapFromState(room->getBattleState());
+
+	if (map != nullptr) {
+		auto itr2 = map->find(room->getID());
+		if (itr2 != map->end()) {
+			map->erase(itr2);
+		}
 	}
 }
 
@@ -140,6 +192,16 @@ std::string Room::addClient(Client* c) {
 	}
 	else {
 		return "is closed";
+	}
+}
+
+void Room::setBattleState(BattleState state) {
+	if (_battleState != state) {
+		BattleState oldState = _battleState;
+
+		_battleState = state;
+
+		addToState(this, oldState);
 	}
 }
 
@@ -271,7 +333,7 @@ void Room::startLevel(Client* c) {
 				c2->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 
-			_battleState = BattleState::PRE_INIT;
+			setBattleState(BattleState::PRE_INIT);
 		} else {
 			ByteArray ba(false);
 			ba.writeUnsignedShort(0x0100);
@@ -385,7 +447,7 @@ bool Room::_isEqualInitState(unsigned int state) {
 void Room::_sendLevelSyncComplete() {
 	if (_battleState != BattleState::RUNNING) {
 		if (_battleState == BattleState::PRE_INIT && _isEqualInitState(1)) {
-			_battleState = BattleState::INITING;
+			setBattleState(BattleState::INITING);
 
 			ByteArray ba(false);
 			ba.writeUnsignedShort(0x0200);
@@ -397,7 +459,7 @@ void Room::_sendLevelSyncComplete() {
 				c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 		} else if (_battleState == BattleState::INITING && _isEqualInitState(2)) {
-			_battleState = BattleState::RUNNING;
+			setBattleState(BattleState::RUNNING);
 
 			ByteArray ba(false);
 			ba.writeUnsignedShort(0x0200);
@@ -460,7 +522,7 @@ void Room::_setClientOrderMask(unsigned char index, bool b) {
 }
 
 void Room::_sendFinishState(unsigned char state) {
-	_battleState = BattleState::FINISHING;
+	setBattleState(BattleState::FINISHING);
 
 	ByteArray ba(false);
 	ba.writeUnsignedShort(0x0200);
