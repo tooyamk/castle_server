@@ -365,6 +365,10 @@ void Client::_executePacket(Packet* p) {
 		startLevel();
 		break;
 	}
+	case 0x0104: {
+		Room::matchRoom(this);
+		break;
+	}
 	case 0x0200: {
 		syncClient(&p->bytes);
 		break;

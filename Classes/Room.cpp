@@ -126,6 +126,36 @@ void Room::joinRoom(Client* c, unsigned int id) {
 	}
 }
 
+void Room::matchRoom(Client* c) {
+	std::lock_guard<std::recursive_mutex> lck(*_staticMtx);
+
+	std::string error = "";
+
+	Room* room = nullptr;
+	for (auto itr = _nocombatRooms.begin(); itr != _nocombatRooms.end(); itr++) {
+		room = itr->second;
+		if (room->getNumClients() < MAX_NUM_PLAYERS) {
+			break;
+		} else {
+			room = nullptr;
+		}
+	}
+
+	if (room == nullptr) {
+		error = "no room";
+	} else {
+		error = room->addClient(c);
+	}
+
+	if (error.size() > 0) {
+		ByteArray ba(false);
+		ba.writeUnsignedShort(0x0100);
+		ba.writeUnsignedChar(0);
+		ba.writeString(error.c_str());
+		c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
+	}
+}
+
 std::string Room::addClient(Client* c) {
 	if (!_isClosed) {
 		std::lock_guard<std::recursive_mutex> lck(_mtx);

@@ -29,6 +29,7 @@ public:
 	static std::unordered_map<unsigned int, Room*>* __fastcall getMapFromState(BattleState state);
 	static Room* __fastcall get(unsigned int id);
 	static void __fastcall joinRoom(Client* c, unsigned int id);
+	static void __fastcall matchRoom(Client* c);
 
 	inline unsigned int __fastcall getID() { return _id; }
 	std::string  __fastcall addClient(Client* c);
