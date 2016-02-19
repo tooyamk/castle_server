@@ -41,6 +41,8 @@ public:
 	void __fastcall syncEntityHP(Client* c, ByteArray* ba);
 	void __fastcall syncEntityGeneratorCreate(Client* c, ByteArray* ba);
 	void __fastcall initLevelComplete(Client* c);
+	void __fastcall setBattleFinish(Client* c, ByteArray* ba);
+	void __fastcall setGobackReadyRoom(Client* c);
 	virtual void __fastcall close();
 	unsigned int __fastcall getNumClients();
 	inline BattleState __fastcall getBattleState() { return _battleState; }
@@ -70,4 +72,6 @@ protected:
 	void __fastcall _setClientOrderMask(unsigned char index, bool b);
 	bool __fastcall _isEqualInitState(unsigned int state);
 	void __fastcall _sendFinishState(unsigned char state);
+	void __fastcall _send0x0100_1(Client* c);//add new player init self
+	void __fastcall _send0x0100_3(Client* c);//send add new player data to others
 };

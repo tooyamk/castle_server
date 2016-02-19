@@ -162,7 +162,7 @@ std::string Room::addClient(Client* c) {
 
 		std::string error = "";
 
-		if (_battleState != BattleState::NONE) {
+		if (_battleState != BattleState::NONE && _battleState != BattleState::FINISHING) {
 			error = "battling";
 		}
 
@@ -180,7 +180,7 @@ std::string Room::addClient(Client* c) {
 			return error;
 		}
 
-		auto& itr = _clients.find(c->getID());
+		auto itr = _clients.find(c->getID());
 		if (itr == _clients.end()) {
 			c->setCurRoom(this);
 			c->order = _getEmptyClientOrder();
@@ -203,24 +203,11 @@ std::string Room::addClient(Client* c) {
 				_host = c;
 			}
 
-			ba.setLength(0);
-			ba.writeUnsignedShort(0x0100);
-			ba.writeUnsignedChar(1);
-			ba.writeUnsignedInt(_id);
-			ba.writeUnsignedInt(_host->getID());
-			ba.writeUnsignedChar(_clients.size());
-			for (auto& itr : _clients) {
-				Client* other = itr.second.get();
-				ba.writeUnsignedInt(other->getID());
-				ba.writeUnsignedChar(other->order);
-				ba.writeBool(other->ready);
-			}
-			c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
+			_send0x0100_1(c);
 		}
 
 		return "";
-	}
-	else {
+	} else {
 		return "is closed";
 	}
 }
@@ -245,6 +232,10 @@ void Room::removeClient(Client* c) {
 			_setClientOrderMask(c->order, false);
 			c->order = -1;
 			c->ready = false;
+
+			if (_battleState == BattleState::FINISHING && _isEqualInitState(0)) {
+				_battleState = BattleState::NONE;
+			}
 
 			if (_battleState == BattleState::NONE) {
 				if (_host == c) {
@@ -315,7 +306,7 @@ void Room::removeClient(Client* c) {
 void Room::setClientReady(Client* c, bool b) {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
-	if (_battleState == BattleState::NONE) {
+	if (_battleState == BattleState::NONE || _battleState == BattleState::FINISHING) {
 		if (c->ready != b && c->getCurRoom() == this) {
 			c->ready = b;
 		}
@@ -462,6 +453,32 @@ void Room::initLevelComplete(Client* c) {
 	}
 }
 
+void Room::setBattleFinish(Client* c, ByteArray* ba) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_battleState == BattleState::RUNNING) {
+		bool success = ba->readBool();
+
+		_sendFinishState(success ? 1 : 2);
+	}
+}
+
+void Room::setGobackReadyRoom(Client* c) {
+	std::lock_guard<std::recursive_mutex> lck(_mtx);
+
+	if (_battleState == BattleState::FINISHING) {
+		if (c->levelInited == 0) {
+			c->levelInited = 1;
+
+			_send0x0100_1(c);
+
+			if (_isEqualInitState(1)) {
+				_battleState = BattleState::NONE;
+			}
+		}
+	}
+}
+
 bool Room::_isEqualInitState(unsigned int state) {
 	for (auto& itr : _clients) {
 		Client* c = itr.second.get();
@@ -497,6 +514,8 @@ void Room::_sendLevelSyncComplete() {
 
 			for (auto& itr : _clients) {
 				Client* c = itr.second.get();
+				c->levelInited = 0;
+				c->ready = false;
 				c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 
@@ -567,4 +586,23 @@ void Room::_sendFinishState(unsigned char state) {
 	if (state == 3) {
 		close();
 	}
+}
+
+void Room::_send0x0100_1(Client* c) {
+	ByteArray ba(false);
+	ba.writeUnsignedShort(0x0100);
+	ba.writeUnsignedChar(1);
+	ba.writeUnsignedInt(_id);
+	ba.writeUnsignedInt(_host->getID());
+	ba.writeUnsignedChar(_clients.size());
+	for (auto& itr : _clients) {
+		Client* other = itr.second.get();
+		ba.writeUnsignedInt(other->getID());
+		ba.writeUnsignedChar(other->order);
+		ba.writeBool(other->ready);
+	}
+	c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
+}
+
+void Room::_send0x0100_3(Client* c) {
 }

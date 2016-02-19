@@ -369,6 +369,12 @@ void Client::_executePacket(Packet* p) {
 		Room::matchRoom(this);
 		break;
 	}
+	case 0x0105: {
+		if (_curRoom.get() != nullptr) {
+			_curRoom->setGobackReadyRoom(this);
+		}
+		break;
+	}
 	case 0x0200: {
 		syncClient(&p->bytes);
 		break;
@@ -384,6 +390,12 @@ void Client::_executePacket(Packet* p) {
 	case 0x0203: {
 		if (_curRoom.get() != nullptr) {
 			_curRoom->syncEntityHP(this, &p->bytes);
+		}
+		break;
+	}
+	case 0x0205: {
+		if (_curRoom.get() != nullptr) {
+			_curRoom->setBattleFinish(this, &p->bytes);
 		}
 		break;
 	}
