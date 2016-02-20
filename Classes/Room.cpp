@@ -1,6 +1,7 @@
 #include "Room.h"
 #include "Client.h"
 #include "ByteArray.h"
+#include "Helper.h"
 
 Room::Room() {
 	_id = _idAccumulator++;
@@ -416,7 +417,13 @@ void Room::syncEntityHP(Client* c, ByteArray* data) {
 			ba.writeUnsignedShort(0x0200);
 			ba.writeUnsignedChar(4);
 			ba.writeBytes(data);
-			_host->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
+
+			for (auto& itr : _clients) {
+				Client* c2 = itr.second.get();
+				if (c2 == c) continue;
+
+				c2->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
+			}
 		}
 	}
 }
@@ -508,9 +515,12 @@ void Room::_sendLevelSyncComplete() {
 		} else if (_battleState == BattleState::INITING && _isEqualInitState(2)) {
 			setBattleState(BattleState::RUNNING);
 
+			_battleStartTime = Helper::iclock64();
+
 			ByteArray ba(false);
 			ba.writeUnsignedShort(0x0200);
 			ba.writeUnsignedChar(2);
+			ba.writeFloat(0.0f);
 
 			for (auto& itr : _clients) {
 				Client* c = itr.second.get();

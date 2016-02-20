@@ -82,6 +82,7 @@
     <ClInclude Include="..\Classes\BaseNet.h" />
     <ClInclude Include="..\Classes\ByteArray.h" />
     <ClInclude Include="..\Classes\Client.h" />
+    <ClInclude Include="..\Classes\Helper.h" />
     <ClInclude Include="..\Classes\ikcp.h" />
     <ClInclude Include="..\Classes\NetDataBuffer.h" />
     <ClInclude Include="..\Classes\NetServer.h" />
@@ -102,6 +103,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\Classes\Client.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Classes\Helper.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\Classes\ikcp.c">

@@ -393,6 +393,12 @@ void Client::_executePacket(Packet* p) {
 		}
 		break;
 	}
+	case 0x0204: {
+		if (_curRoom.get() != nullptr) {
+			_curRoom->syncEntityGeneratorCreate(this, &p->bytes);
+		}
+		break;
+	}
 	case 0x0205: {
 		if (_curRoom.get() != nullptr) {
 			_curRoom->setBattleFinish(this, &p->bytes);

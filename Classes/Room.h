@@ -60,6 +60,7 @@ protected:
 	unsigned int _clientsMask;
 	unsigned int _id;
 	bool _isClosed;
+	unsigned long long _battleStartTime;
 	BattleState _battleState;
 	std::recursive_mutex _mtx;
 	std::unordered_map<unsigned int, std::tr1::shared_ptr<Client>> _clients;

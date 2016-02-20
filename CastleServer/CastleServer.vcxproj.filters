@@ -63,6 +63,9 @@
     <ClInclude Include="..\Classes\Client.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\Classes\Helper.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -102,6 +105,9 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\Classes\Client.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Classes\Helper.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
