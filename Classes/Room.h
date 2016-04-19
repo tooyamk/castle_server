@@ -42,6 +42,7 @@ public:
 	void __fastcall syncEntityGeneratorCreate(Client* c, ByteArray* ba);
 	void __fastcall initLevelComplete(Client* c);
 	void __fastcall setBattleFinish(Client* c, ByteArray* ba);
+	void __fastcall setGiveUp(Client* c);
 	void __fastcall setGobackReadyRoom(Client* c);
 	virtual void __fastcall close();
 	unsigned int __fastcall getNumClients();

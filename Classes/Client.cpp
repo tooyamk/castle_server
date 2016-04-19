@@ -405,6 +405,12 @@ void Client::_executePacket(Packet* p) {
 		}
 		break;
 	}
+	case 0x0206: {
+		if (_curRoom.get() != nullptr) {
+			_curRoom->setGiveUp(this);
+		}
+		break;
+	}
 	default:
 		break;
 	}

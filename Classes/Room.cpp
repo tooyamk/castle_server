@@ -470,6 +470,10 @@ void Room::setBattleFinish(Client* c, ByteArray* ba) {
 	}
 }
 
+void Room::setGiveUp(Client* c) {
+	removeClient(c);
+}
+
 void Room::setGobackReadyRoom(Client* c) {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
