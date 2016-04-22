@@ -119,11 +119,7 @@ void Room::joinRoom(Client* c, unsigned int id) {
 	}
 
 	if (error.size() > 0) {
-		ByteArray ba(false);
-		ba.writeUnsignedShort(0x0100);
-		ba.writeUnsignedChar(0);
-		ba.writeString(error.c_str());
-		c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
+		send0x0100_0(c, error);
 	}
 }
 
@@ -276,7 +272,7 @@ void Room::removeClient(Client* c) {
 				ba.writeUnsignedChar(2);
 				c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 
-				_sendLevelSyncComplete();
+				_sendChapterSyncComplete();
 			} else {
 				if (_host == c) {
 					_host = nullptr;
@@ -326,7 +322,7 @@ void Room::setClientReady(Client* c, bool b) {
 	}
 }
 
-void Room::startLevel(Client* c) {
+void Room::startChapter(Client* c) {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
 	if (_battleState == BattleState::NONE) {
@@ -385,7 +381,7 @@ void Room::syncClient(Client* c, ByteArray* data) {
 				c2->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 			}
 
-			_sendLevelSyncComplete();
+			_sendChapterSyncComplete();
 		}
 	}
 }
@@ -448,14 +444,14 @@ void Room::syncEntityGeneratorCreate(Client* c, ByteArray* data) {
 	}
 }
 
-void Room::initLevelComplete(Client* c) {
+void Room::initChapterComplete(Client* c) {
 	std::lock_guard<std::recursive_mutex> lck(_mtx);
 
 	if (_battleState == BattleState::INITING) {
 		if (c->levelInited == 1) {
 			c->levelInited = 2;
 
-			_sendLevelSyncComplete();
+			_sendChapterSyncComplete();
 		}
 	}
 }
@@ -502,7 +498,7 @@ bool Room::_isEqualInitState(unsigned int state) {
 	return true;
 }
 
-void Room::_sendLevelSyncComplete() {
+void Room::_sendChapterSyncComplete() {
 	if (_battleState != BattleState::RUNNING) {
 		if (_battleState == BattleState::PRE_INIT && _isEqualInitState(1)) {
 			setBattleState(BattleState::INITING);
@@ -600,6 +596,14 @@ void Room::_sendFinishState(unsigned char state) {
 	if (state == 3) {
 		close();
 	}
+}
+
+void Room::send0x0100_0(Client* c, const std::string& error) {
+	ByteArray ba(false);
+	ba.writeUnsignedShort(0x0100);
+	ba.writeUnsignedChar(0);
+	ba.writeString(error.c_str());
+	c->sendData(ba.getBytes(), ba.getLength(), NetType::TCP);
 }
 
 void Room::_send0x0100_1(Client* c) {

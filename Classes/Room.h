@@ -35,12 +35,12 @@ public:
 	std::string  __fastcall addClient(Client* c);
 	void __fastcall removeClient(Client* c);
 	void __fastcall setClientReady(Client* c, bool b);
-	void __fastcall startLevel(Client* c);
+	void __fastcall startChapter(Client* c);
 	void __fastcall syncClient(Client* c, ByteArray* ba);
 	void __fastcall syncEntity(Client* c, ByteArray* ba);
 	void __fastcall syncEntityHP(Client* c, ByteArray* ba);
 	void __fastcall syncEntityGeneratorCreate(Client* c, ByteArray* ba);
-	void __fastcall initLevelComplete(Client* c);
+	void __fastcall initChapterComplete(Client* c);
 	void __fastcall setBattleFinish(Client* c, ByteArray* ba);
 	void __fastcall setGiveUp(Client* c);
 	void __fastcall setGobackReadyRoom(Client* c);
@@ -50,6 +50,8 @@ public:
 	void __fastcall setBattleState(BattleState state);
 
 	const std::tr1::shared_ptr<Room>& getSharedPtr() { return _self; }
+
+	static void __fastcall send0x0100_0(Client* c, const std::string& error);//add room error
 
 protected:
 	static unsigned int _idAccumulator;
@@ -69,7 +71,7 @@ protected:
 	std::tr1::shared_ptr<Room> _self;
 	Client* _host;
 
-	void __fastcall _sendLevelSyncComplete();
+	void __fastcall _sendChapterSyncComplete();
 	char __fastcall _getEmptyClientOrder();
 	void __fastcall _setClientOrderMask(unsigned char index, bool b);
 	bool __fastcall _isEqualInitState(unsigned int state);

@@ -33,10 +33,10 @@ public:
 	virtual Room* __fastcall getCurRoom();
 	virtual void __fastcall setCurRoom(Room* room);
 	virtual void __fastcall switchReadyState();
-	virtual void __fastcall startLevel();
+	virtual void __fastcall startChapter();
 	virtual void __fastcall syncClient(ByteArray* ba);
 	virtual void __fastcall syncEntity(ByteArray* ba);
-	virtual void __fastcall initLevelComplete();
+	virtual void __fastcall initChapterComplete();
 	virtual void __fastcall sendData(const char* bytes, int len, NetType type);
 	virtual void __fastcall __sendUDP(const char* data, unsigned int len);
 	const std::tr1::shared_ptr<Client>& getSharedPtr() { return _self; }

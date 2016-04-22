@@ -184,9 +184,9 @@ void Client::switchReadyState() {
 	}
 }
 
-void Client::startLevel() {
+void Client::startChapter() {
 	if (_curRoom.get() != nullptr) {
-		_curRoom->startLevel(this);
+		_curRoom->startChapter(this);
 	}
 }
 
@@ -202,9 +202,9 @@ void Client::syncEntity(ByteArray* ba) {
 	}
 }
 
-void Client::initLevelComplete() {
+void Client::initChapterComplete() {
 	if (_curRoom.get() != nullptr) {
-		_curRoom->initLevelComplete(this);
+		_curRoom->initChapterComplete(this);
 	}
 }
 
@@ -362,7 +362,7 @@ void Client::_executePacket(Packet* p) {
 		break;
 	}
 	case 0x0103: {
-		startLevel();
+		startChapter();
 		break;
 	}
 	case 0x0104: {
@@ -370,7 +370,9 @@ void Client::_executePacket(Packet* p) {
 		break;
 	}
 	case 0x0105: {
-		if (_curRoom.get() != nullptr) {
+		if (_curRoom.get() == nullptr) {
+			Room::send0x0100_0(this, "not join room");
+		} else {
 			_curRoom->setGobackReadyRoom(this);
 		}
 		break;
@@ -380,7 +382,7 @@ void Client::_executePacket(Packet* p) {
 		break;
 	}
 	case 0x0201: {
-		initLevelComplete();
+		initChapterComplete();
 		break;
 	}
 	case 0x0202: {
@@ -408,6 +410,7 @@ void Client::_executePacket(Packet* p) {
 	case 0x0206: {
 		if (_curRoom.get() != nullptr) {
 			_curRoom->setGiveUp(this);
+			_curRoom.reset();
 		}
 		break;
 	}
