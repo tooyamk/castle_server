@@ -414,6 +414,12 @@ void Client::_executePacket(Packet* p) {
 		}
 		break;
 	}
+	case 0x0207: {
+		if (_curRoom.get() != nullptr) {
+			_curRoom->dropItem(this, &p->bytes);
+		}
+		break;
+	}
 	default:
 		break;
 	}

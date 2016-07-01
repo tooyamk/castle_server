@@ -44,6 +44,7 @@ public:
 	void __fastcall setBattleFinish(Client* c, ByteArray* ba);
 	void __fastcall setGiveUp(Client* c);
 	void __fastcall setGobackReadyRoom(Client* c);
+	void __fastcall dropItem(Client* c, ByteArray* data);
 	virtual void __fastcall close();
 	unsigned int __fastcall getNumClients();
 	inline BattleState __fastcall getBattleState() { return _battleState; }

@@ -486,6 +486,24 @@ void Room::setGobackReadyRoom(Client* c) {
 	}
 }
 
+void Room::dropItem(Client* c, ByteArray* data) {
+	if (_battleState == BattleState::RUNNING) {
+		if (_host != nullptr) {
+			ByteArray ba(false);
+			ba.writeUnsignedShort(0x0200);
+			ba.writeUnsignedChar(8);
+			ba.writeBytes(data);
+
+			for (auto& itr : _clients) {
+				Client* other = itr.second.get();
+				if (other == c) continue;
+
+				other->sendData(ba.getBytes(), ba.getLength(), NetType::KCP);
+			}
+		}
+	}
+}
+
 bool Room::_isEqualInitState(unsigned int state) {
 	for (auto& itr : _clients) {
 		Client* c = itr.second.get();
